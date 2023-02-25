@@ -13,7 +13,7 @@ void serial_obre(void) {
   cua_buida(&cua_rx);
   cua_buida(&cua_tx);
 
-  UCSR0A = 1 << U2X0;
+  //UCSR0A = 1 << U2X0;
   UCSR0B = (1 << RXEN0) | (1 << TXEN0) | (1 << RXCIE0);
   UCSR0C = (1 << UCSZ01) | (1 << UCSZ00);
   UBRR0 = 0;//UBRR_VALUE;
