@@ -8,8 +8,6 @@ debug="0" # "1" per habilitar, "0" per deshabilitar
 
 function surt {
     rm -f $cua_dades
-    kill $pid_bucle
-    kill $pid_plot
     exit
 }
 trap surt SIGINT EXIT
@@ -28,7 +26,7 @@ mkfifo $cua_dades
 
 function bucle_lectura {
     stty -F $port sane
-    stty -F $port raw speed 1000000 -echo > /dev/null # Necessari perque cat o read no es pengin
+    stty -F $port raw speed 1000000 -echo > /dev/null # "-echo" necessari perque cat o read no es pengin
     n_mostres_llegides=$n_mostres
     mostres_llegides=""
     n1_lectura=0
@@ -40,7 +38,6 @@ function bucle_lectura {
             $e_esperant_trigger)
                 if (( ($n1_lectura <= $nivell_trigger && $n_lectura >= $nivell_trigger) )); then
                     estat=$e_capturant
-                    echo "$n_lectura $n1_lectura"
                 fi
             ;;
             $e_capturant)
@@ -51,10 +48,14 @@ function bucle_lectura {
                     n_mostres_llegides=$n_mostres
                     mostres_llegides=""
                     estat=$e_esperant_trigger;
-                    echo "DONE"
                 fi
             ;;
             $e_inicial)
+                if [[ $debug -eq "1" ]]; then
+                    gnuplot -e "cua_lectura='${cua_dades}'; fs=${fs}" ${directori}/plot_debug.gnu &
+                else
+                    gnuplot -e "cua_lectura='${cua_dades}'; fs=${fs}" ${directori}/plot.gnu &
+                fi
                 estat=$e_esperant_trigger
             ;;
         esac
@@ -62,18 +63,4 @@ function bucle_lectura {
     done < $port
 }
 
-bucle_lectura &
-pid_bucle=$!
-if [[ $debug -eq "1" ]]; then
-    gnuplot -e "cua_lectura='${cua_dades}'; fs=${fs}" ${directori}/plot_debug.gnu
-else
-    gnuplot -e "cua_lectura='${cua_dades}'; fs=${fs}" ${directori}/plot.gnu
-fi
-pid_plot=$!
-sleep infinity
-
-
-
-
-
-
+bucle_lectura
