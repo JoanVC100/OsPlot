@@ -1,7 +1,10 @@
 #!/bin/bash
 cua_dades="/tmp/osplot.dat"
 directori=$(dirname $(realpath -s "$0"))
-fs=50e3
+fs=$((16000000/128/13))
+n_mostres=500
+nivell_trigger=128
+debug="0" # "1" per habilitar, "0" per deshabilitar
 
 function surt {
     rm -f $cua_dades
@@ -23,47 +26,49 @@ fi
 rm -f $cua_dades
 mkfifo $cua_dades
 
-n_mostres=500
 function bucle_lectura {
     stty -F $port sane
     stty -F $port raw speed 1000000 -echo > /dev/null # Necessari perque cat o read no es pengin
-    n=$n_mostres
-    s=""
-    captura=0 # 0 si no es pot capturar, 1 si sí es pot
-    nivell_trigger=1
-    n1_lectura=0 # Lectura anterior
-    en_pujada=1 # Flanc descendent sii és 0. Si hi ha flanc
-    #ascendent i la lectura esta per sota el trigger, és 1
+    n_mostres_llegides=$n_mostres
+    mostres_llegides=""
+    n1_lectura=0
+    e_inicial=0; e_esperant_trigger=1; e_capturant=2;
+    estat=$e_inicial
     while read -r linia; do
         n_lectura=$((10#$linia))
-        deriv=$(($n_lectura-$n1_lectura))
+        case $estat in
+            $e_esperant_trigger)
+                if (( ($n1_lectura <= $nivell_trigger && $n_lectura >= $nivell_trigger) )); then
+                    estat=$e_capturant
+                    echo "$n_lectura $n1_lectura"
+                fi
+            ;;
+            $e_capturant)
+                printf -v mostres_llegides "%s%s\n" "$mostres_llegides" "$n_lectura"
+                ((n_mostres_llegides=n_mostres_llegides-1))
+                if (( !n_mostres_llegides )); then
+                    echo "$mostres_llegides" > $cua_dades
+                    n_mostres_llegides=$n_mostres
+                    mostres_llegides=""
+                    estat=$e_esperant_trigger;
+                    echo "DONE"
+                fi
+            ;;
+            $e_inicial)
+                estat=$e_esperant_trigger
+            ;;
+        esac
         n1_lectura=$n_lectura
-        if (( $deriv > 0 && $n_lectura <= $nivell_trigger )); then
-            en_pujada=1
-        elif (( $deriv < 0 )); then
-            en_pujada=0
-        fi
-        if (( $captura == 1 )); then
-            printf -v s "%s%s\n" "$s" "$n_lectura"
-            ((n=n-1))
-            if (( !n )); then
-                echo "$s" > $cua_dades
-                n=$n_mostres
-                s=""
-                captura=0
-                en_pujada=0
-            fi
-        else
-            if (( $en_pujada == 1 && $n_lectura >= $nivell_trigger )); then
-                captura=1
-            fi
-        fi
     done < $port
 }
 
 bucle_lectura &
 pid_bucle=$!
-gnuplot -e "cua_lectura='${cua_dades}'; fs=${fs}" ${directori}/plot.gnu
+if [[ $debug -eq "1" ]]; then
+    gnuplot -e "cua_lectura='${cua_dades}'; fs=${fs}" ${directori}/plot_debug.gnu
+else
+    gnuplot -e "cua_lectura='${cua_dades}'; fs=${fs}" ${directori}/plot.gnu
+fi
 pid_plot=$!
 sleep infinity
 
