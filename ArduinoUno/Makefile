@@ -4,13 +4,19 @@ CFLAGS=-Wall -std=c17 -Ofast -mmcu=atmega328p -fshort-enums
 CFLAGS+=--param=min-pagesize=0 # Necessari per eliminar avisos a Arch
 LDFLAGS=$(CFLAGS)
 
-lectura_adc: lectura_adc.c serial.o cua.o adc.o
-serra: serra.c serial.o cua.o
-sinus: sinus.c serial.o cua.o
+tots: lectura_adc serra sinus sinus_artefacte pols pols_generat
+
+lectura_adc: lectura_adc.c serial.o cua.o adc.o print_num.o
+serra: serra.c serial.o cua.o print_num.o
+sinus: sinus.c serial.o cua.o print_num.o
+sinus_artefacte: sinus_artefacte.c serial.o cua.o print_num.o
+pols: pols.c serial.o cua.o
+pols_generat: pols_generat.c serial.o cua.o adc.o print_num.o
 
 serial.o: serial.c serial.h cua.h
 cua.o: cua.c cua.h
 adc.o: adc.c adc.h
+print_num.o: print_num.c print_num.h serial.h
 
 .PHONY: grava_arduino neteja
 PORT ?= /dev/ttyACM0
@@ -24,4 +30,4 @@ else
 endif
 
 neteja:
-	\rm -f *~ *.o lectura_adc serra sinus
+	\rm -f *~ *.o lectura_adc serra sinus sinus_artefacte pols pols_generat

@@ -1,27 +1,21 @@
-#include <stdio.h>
-#include <string.h>
+#include <stdint.h>
 #include <avr/interrupt.h>
 #include <util/delay.h>
 #include "serial.h"
+#include "print_num.h"
 
 #define uTS 20
+#define VALOR_MAXIM 255
 
 int main() {
-
-    uint8_t lectura = 255;
-
     serial_obre();
     sei();
 
-    char s[4] = {0,0,0,0};
+    uint8_t lectura = VALOR_MAXIM;
     while(1) {
-        snprintf(s, sizeof(s), "%03d", lectura);
-        for (uint8_t c = 0; s[c] != '\0'; c++) {
-            serial_envia(s[c]);
-        }
-        serial_envia('\n');
+        print_num_dec(lectura);
         if (!lectura--) {
-            lectura = 255;
+            lectura = VALOR_MAXIM;
         }
         _delay_us(uTS);
     }
