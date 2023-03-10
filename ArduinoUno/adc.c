@@ -11,11 +11,12 @@ void adc_inicia(adc_pin_t pin, adc_vref_t vref, adc_prescaler_t prescaler) {
   PORTC = 0; // Deshabilita pull-ups als pins analògics
   switch (prescaler) {
     case p2: prescaler = 1;
-    case p8: prescaler = 2;
-    case p16: prescaler = 3;
-    case p32: prescaler = 4;
-    case p64: prescaler = 5;
-    default: prescaler = 6;
+    case p4: prescaler = 2;
+    case p8: prescaler = 3;
+    case p16: prescaler = 4;
+    case p32: prescaler = 5;
+    case p64: prescaler = 6;
+    default: prescaler = 7;
   }
   ADCSRA |= (1 << ADEN) | prescaler;
 }
