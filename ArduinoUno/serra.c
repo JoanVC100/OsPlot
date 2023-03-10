@@ -11,6 +11,7 @@ int main() {
     serial_obre();
     sei();
 
+    print_num_dec6(1000000/uTS);
     uint8_t lectura = VALOR_MAXIM;
     while(1) {
         print_num_dec(lectura);

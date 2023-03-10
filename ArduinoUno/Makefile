@@ -10,7 +10,7 @@ lectura_adc: lectura_adc.c serial.o cua.o adc.o print_num.o
 serra: serra.c serial.o cua.o print_num.o
 sinus: sinus.c serial.o cua.o print_num.o
 sinus_artefacte: sinus_artefacte.c serial.o cua.o print_num.o
-pols: pols.c serial.o cua.o
+pols: pols.c serial.o cua.o print_num.o
 pols_generat: pols_generat.c serial.o cua.o adc.o print_num.o
 
 serial.o: serial.c serial.h cua.h

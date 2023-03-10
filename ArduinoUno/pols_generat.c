@@ -9,10 +9,12 @@
 
 //#define DEBUG 1
 
-#define PRESCALER 64UL
-#define FREQ_POLS 500UL
+#define PRESCALER_ADC p128
 
-#define VALOR_OCR1A (F_CPU / (2UL*PRESCALER*FREQ_POLS))
+#define PRESCALER_TIMER 256UL
+#define FREQ_POLS 1UL
+
+#define VALOR_OCR1A (F_CPU / (2UL*PRESCALER_TIMER*FREQ_POLS) - 1)
 #if VALOR_OCR1A == 0
     #error "Freqüència o prescaler massa grans"
 #elif VALOR_OCR1A > 65535
@@ -25,7 +27,7 @@ int main() {
     OCR1A = (uint16_t) VALOR_OCR1A;
     DDRB |= 1 << PINB1;
     uint8_t prescaler;
-    switch (PRESCALER) {
+    switch (PRESCALER_TIMER) {
         case 1024: prescaler = 0b101; break;
         case 256: prescaler = 0b100; break;
         case 64: prescaler = 0b011; break;
@@ -35,7 +37,7 @@ int main() {
     TCCR1B |= (1 << WGM12) | prescaler;
     ////////////////////////////////////////////
 
-    adc_inicia(a5, v5, p128);
+    adc_inicia(a5, v5, PRESCALER_ADC);
     adc_inici_lectura();
     serial_obre();
     sei();
@@ -43,6 +45,7 @@ int main() {
 #ifdef DEBUG
     DDRD |= 1 << PIN7;
 #endif
+    print_num_dec6(ADC_CALCULA_FS(PRESCALER_ADC));
     while(1) {
 #ifdef DEBUG
         PORTD = 1 << PIN7;

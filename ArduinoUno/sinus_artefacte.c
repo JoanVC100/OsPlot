@@ -11,6 +11,7 @@ int main() {
     serial_obre();
     sei();
 
+    print_num_dec6(1000000/uTS);
     uint16_t index = sizeof(SINUS);
     uint8_t intents = 5;
     while(1) {
