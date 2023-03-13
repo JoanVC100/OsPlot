@@ -1,0 +1,30 @@
+name: osplot
+help: CLI per interactuar amb múltiples opcions de l'oscil·loscopi OsPlot
+version: 0.1.0
+
+commands:
+- name: mostres_finestra
+  alias: n
+  help: Canvia el nombre de mostres que s'ensenyen a cada trigger.
+  args:
+  - name: n_mostres
+    required: true
+    help: El nombre de mostres. Nomes s'accepten enters entre 50 i 1000.
+  examples:
+  - osplot mostres_finestra 500
+  - osplot n 500
+
+- name: nivell_trigger
+  alias: t
+  help: Canvia el nivell del trigger.
+  args:
+  - name: nivell
+    required: true
+    help: El nivell del trigger. Nomes s'accepten valors entre 0 i 5.
+  flags:
+  - long: --sense-escalar
+    short: -s
+    help: Interpreta n_mostres com un nombre entre 0 i 255.
+  examples:
+  - osplot mostres_finestra 2.5
+  - osplot n -s 128
