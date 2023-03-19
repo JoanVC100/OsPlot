@@ -7,12 +7,13 @@
 
 /* S'ha de connectar el pin 9 de l'Arduino a l'A5 */
 
-//#define DEBUG 1
+#define ENVIA_BIN
+//#define DEBUG
 
 #define PRESCALER_ADC p128
 
 #define PRESCALER_TIMER 256UL
-#define FREQ_POLS 1UL
+#define FREQ_POLS 100UL
 
 #define VALOR_OCR1A (F_CPU / (2UL*PRESCALER_TIMER*FREQ_POLS) - 1)
 #if VALOR_OCR1A == 0
@@ -45,7 +46,14 @@ int main() {
 #ifdef DEBUG
     DDRD |= 1 << PIN7;
 #endif
+
+#ifdef ENVIA_BIN
+    serial_llegir();
+    serial_envia_4byte(ADC_CALCULA_FS(PRESCALER_ADC));
+#else
     print_num_dec6(ADC_CALCULA_FS(PRESCALER_ADC));
+#endif
+
     while(1) {
 #ifdef DEBUG
         PORTD = 1 << PIN7;
@@ -55,6 +63,11 @@ int main() {
         PORTD = 0;
 #endif
         adc_inici_lectura();
+    
+#ifdef ENVIA_BIN
+        serial_envia_byte(lectura);
+#else
         print_num_dec(lectura);
+#endif
     }
 }

@@ -1,6 +1,6 @@
 CC=avr-gcc
 CPPFLAGS=-DF_CPU=16000000UL
-CFLAGS=-Wall -std=c17 -Ofast -mmcu=atmega328p -fshort-enums
+CFLAGS=-Wall -std=c17 -Ofast -mmcu=atmega328p -fshort-enums -flto
 CFLAGS+=--param=min-pagesize=0 # Necessari per eliminar avisos a Arch
 LDFLAGS=$(CFLAGS)
 

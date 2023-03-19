@@ -7,8 +7,8 @@ void print_num_dec(uint8_t valor) {
     s[c] = (valor % 10) + '0';
     valor /= 10;
   }
-  serial_envia(s[0]); serial_envia(s[1]); serial_envia(s[2]);
-  serial_envia('\n');
+  serial_envia_byte(s[0]); serial_envia_byte(s[1]); serial_envia_byte(s[2]);
+  serial_envia_byte('\n');
 }
 
 void print_num_dec6(uint32_t valor) {
@@ -17,8 +17,8 @@ void print_num_dec6(uint32_t valor) {
     s[c] = (valor % 10) + '0';
     valor /= 10;
   }
-  serial_envia(s[0]); serial_envia(s[1]); serial_envia(s[2]);
-  serial_envia(s[3]); serial_envia(s[4]); serial_envia(s[5]);
-  serial_envia('\n');
+  serial_envia_byte(s[0]); serial_envia_byte(s[1]); serial_envia_byte(s[2]);
+  serial_envia_byte(s[3]); serial_envia_byte(s[4]); serial_envia_byte(s[5]);
+  serial_envia_byte('\n');
 }
 

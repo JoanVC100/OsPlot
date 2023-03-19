@@ -43,9 +43,17 @@ uint8_t serial_llegir(void) {
   return cua_treu(&cua_rx);
 }
 
-void serial_envia(uint8_t c) {
+void serial_envia_byte(uint8_t b) {
   while(cua_es_plena(&cua_tx));
-  cua_posa(&cua_tx, c);
+  cua_posa(&cua_tx, b);
+  UCSR0B |= (1  << UDRIE0);
+}
+
+void serial_envia_4byte(uint32_t b) {
+  while(cua_es_plena(&cua_tx));
+  for (uint8_t c = 0; c <= 3; c++) {
+    cua_posa(&cua_tx, ((uint8_t*) &b)[c]);
+  }
   UCSR0B |= (1  << UDRIE0);
 }
 
