@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package OsPlot;
+
+message OsPlotMsgServidor {
+  enum Tipus_Msg {
+    _Null = 0;
+    Connexio_Inicial_OK = 1;
+    Mostres = 2;
+  }
+  Tipus_Msg tipus = 1;
+  optional bytes mostres = 15;
+}
+
+message OsPlotMsgClient {
+  enum Tipus_Msg {
+    _Null = 0;
+    Connexio_Inicial = 1;
+  }
+  Tipus_Msg tipus = 1;
+}
