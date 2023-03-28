@@ -1,3 +1,5 @@
+const FFT = require("fft.js");
+
 const ctx = document.getElementById("grafica").getContext("2d");
 const grafica = new Chart(ctx, {
     type: "line",
@@ -6,17 +8,23 @@ const grafica = new Chart(ctx, {
         datasets: [{
             label: "OsPlot",
             borderColor: "rgb(75, 192, 192)",
+            data: []
         }]
     },
     options: {
+        normalized: true,
+        parsing: false,
         scales: {
             y: {
                 beginAtZero: true,
                 max: 255
-            }
+            },
         }
     }
 });
+for (let i = 0; i < 500; i++) {
+    grafica.data.datasets[0].data[i] = {x: i, y: null};
+}
 grafica.options.animation = false; // disables all animations
 grafica.options.animations.colors = false; // disables animation defined by the collection of 'colors' properties
 grafica.options.animations.x = false; // disables animation defined by the 'x' property
@@ -43,7 +51,10 @@ socket.onmessage = function(event) {
 
     switch (msg.tipus) {
     case OsPlotMsgServidor.Tipus_Msg.Mostres:
-        grafica.data.datasets[0].data = msg.mostres;
+        const n_dades = msg.mostres.length;
+        for (let i = 0; i < n_dades; i++) {
+            grafica.data.datasets[0].data[i].y = msg.mostres[i];
+        }
         grafica.update();
         break;
     case OsPlotMsgServidor.Tipus_Msg.Connexio_Inicial_OK:

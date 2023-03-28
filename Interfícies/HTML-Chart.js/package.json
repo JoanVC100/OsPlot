@@ -1,0 +1,14 @@
+{
+  "name": "osplot-web",
+  "version": "0.1",
+  "description": "Interfície web per oscil·loscopis que segueixin l'arquitectura OsPlot",
+  "scripts": {
+    "build": "browserify node_modules/chart.js/dist/chart.umd.js node_modules/protobufjs/dist/protobuf.min.js node_modules/fft.js/dist/fft.js grafica.js -o bundle.js"
+  },
+  "dependencies": {
+    "browserify": "^17.0.0",
+    "chart.js": "^4.2.1",
+    "fft.js": "^4.0.4",
+    "protobufjs": "^7.2.3"
+  }
+}
