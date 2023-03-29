@@ -4,7 +4,7 @@ import aioserial
 from missatges_pb2 import *
 
 directori_treball="/tmp/OsPlot"
-defecte_n_mostres=1000 # 500 mostres per defecte
+defecte_n_mostres=500 # 500 mostres per defecte
 defecte_nivell_trigger=128 # 128 per defecte
 debug=False # True per habilitar, False per deshabilitar
 
@@ -26,12 +26,11 @@ def inicia_trigger(event_loop):
 
 from enum import Enum
 Trigger = Enum("Trigger", ["ESPERANT_TRIGGER", "CAPTURANT"])
-fs = 0
 async def trigger(port_serial: aioserial.AioSerial):
-    n_mostres_a_llegir = defecte_n_mostres
+    n_mostres_a_llegir = 0
     nivell_trigger = defecte_nivell_trigger
     n1_lectura = 0
-    lectures = bytearray()
+    lectures = bytearray(defecte_n_mostres)
     msg = OsPlotMsgServidor()
     msg.tipus = OsPlotMsgServidor.Mostres
 
@@ -43,6 +42,7 @@ async def trigger(port_serial: aioserial.AioSerial):
 
     estat = Trigger.ESPERANT_TRIGGER
     while True:
+        dades: bytes = await port_serial.read_async(100)
         for n_lectura in dades:
 
             if estat == Trigger.ESPERANT_TRIGGER:
@@ -51,24 +51,21 @@ async def trigger(port_serial: aioserial.AioSerial):
                 n1_lectura = n_lectura
 
             elif estat == Trigger.CAPTURANT:
-                lectures.extend(n_lectura.to_bytes(1, "little"))
-                n_mostres_a_llegir -= 1
-                if not n_mostres_a_llegir:
+                lectures[n_mostres_a_llegir] = n_lectura
+                n_mostres_a_llegir += 1
+                if n_mostres_a_llegir == defecte_n_mostres:
                     msg.mostres = bytes(lectures)
                     websockets.broadcast(connectats, msg.SerializeToString())
-                    lectures = bytearray()
-                    n_mostres_a_llegir = defecte_n_mostres
+                    n_mostres_a_llegir = 0
                     estat=Trigger.ESPERANT_TRIGGER
                 n1_lectura=n_lectura
 
-        dades: bytes = await port_serial.read_async(100)
-
 async def trigger_debug(port_serial: aioserial.AioSerial):
     import time
-    n_mostres_a_llegir = defecte_n_mostres
+    n_mostres_a_llegir = 0
     nivell_trigger = defecte_nivell_trigger
     n1_lectura = 0
-    lectures = bytearray()
+    lectures = bytearray(defecte_n_mostres)
     msg = OsPlotMsgServidor()
     msg.tipus = OsPlotMsgServidor.Mostres
 
@@ -81,6 +78,7 @@ async def trigger_debug(port_serial: aioserial.AioSerial):
     estat = Trigger.ESPERANT_TRIGGER
     temps_inici = None
     while True:
+        dades: bytes = await port_serial.read_async(100)
         for n_lectura in dades:
 
             if estat == Trigger.ESPERANT_TRIGGER:
@@ -90,18 +88,15 @@ async def trigger_debug(port_serial: aioserial.AioSerial):
                 temps_inici = time.time()
 
             elif estat == Trigger.CAPTURANT:
-                lectures.extend(n_lectura.to_bytes(1, "little"))
-                n_mostres_a_llegir -= 1
-                if not n_mostres_a_llegir:
+                lectures[n_mostres_a_llegir] = n_lectura
+                n_mostres_a_llegir += 1
+                if n_mostres_a_llegir == defecte_n_mostres:
                     msg.mostres = bytes(lectures)
                     websockets.broadcast(connectats, msg.SerializeToString())
-                    lectures = bytearray()
-                    print(time.time()-temps_inici)
-                    n_mostres_a_llegir = defecte_n_mostres
+                    print((time.time()-temps_inici)*1000)
+                    n_mostres_a_llegir = 0
                     estat=Trigger.ESPERANT_TRIGGER
                 n1_lectura=n_lectura
-
-        dades: bytes = await port_serial.read_async(100)
 
 async def handler(websocket):
     connectats.add(websocket)
