@@ -7,7 +7,10 @@
 #define ENVIA_BIN
 
 #include "sinus.h"
-#define SINUS hz_127
+#define SINUS hz_100
+
+#define INTENTS_ARTEFACTE 5
+#define INDEX_ARTEFACTE 327
 
 int main() {
     serial_obre();
@@ -21,27 +24,24 @@ int main() {
 #endif
 
     uint16_t index = sizeof(SINUS);
-    uint8_t intents = 5;
+    uint8_t intents = INTENTS_ARTEFACTE;
     while(1) {
 #ifdef ENVIA_BIN
-        if (--index != 327) {
+        if (--index != INDEX_ARTEFACTE) {
             serial_envia_byte(SINUS[index]);
             if (!index) {
                 index = sizeof(SINUS);
             }
         }
         else if (!(--intents)) {
-            serial_envia_byte('1');
-            serial_envia_byte('4');
-            serial_envia_byte('6');
-            serial_envia_byte('\n');
-            intents = 5;
+            serial_envia_byte(146);
+            intents = INTENTS_ARTEFACTE;
         }
         else {
             serial_envia_byte(SINUS[index]);
         }
 #else
-        if (--index != 327) {
+        if (--index != INDEX_ARTEFACTE) {
             print_num_dec(SINUS[index]);
             if (!index) {
                 index = sizeof(SINUS);
@@ -52,7 +52,7 @@ int main() {
             serial_envia_byte('4');
             serial_envia_byte('6');
             serial_envia_byte('\n');
-            intents = 5;
+            intents = INTENTS_ARTEFACTE;
         }
         else {
             print_num_dec(SINUS[index]);

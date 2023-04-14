@@ -17,14 +17,13 @@ int main() {
     serial_llegir();
     serial_envia_4byte(SINUS_FS);
 #else
-    print_num_dec6(Fs);
+    print_num_dec6(SINUS_FS);
 #endif
 
     uint16_t index = sizeof(SINUS)-1;
     while(1) {
 #ifdef ENVIA_BIN
-        uint32_t a = SINUS[index];
-        serial_envia_byte(a);
+        serial_envia_byte(SINUS[index]);
 #else
         print_num_dec(SINUS[index]);
 #endif

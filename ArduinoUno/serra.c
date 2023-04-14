@@ -19,7 +19,7 @@ int main() {
     serial_llegir();
     serial_envia_4byte(FS);
 #else
-    print_num_dec6(1000000/uTS);
+    print_num_dec6(FS);
 #endif
 
     uint8_t lectura = VALOR_MAXIM;

@@ -6,9 +6,11 @@
 #define ENVIA_BIN
 
 #define uTS 20
-#define uTsenyal 40
+#define uTsenyal 10000
 
 #define FS 1000000/uTS
+
+#define N_SENYAL uTsenyal/uTS
 
 int main() {
     serial_obre();
@@ -21,13 +23,13 @@ int main() {
     print_num_dec6(FS);
 #endif
 
-    unsigned int n = uTsenyal/2;
+    unsigned int n = N_SENYAL;
     while(1) {
 #ifdef ENVIA_BIN
-        if (n >= uTsenyal/4) serial_envia_byte(255);
+        if (n >= N_SENYAL/2) serial_envia_byte(255);
         else serial_envia_byte(0);
 #else
-        if (n >= uTsenyal/4) {
+        if (n >= N_SENYAL/2) {
             serial_envia_byte('2');
             serial_envia_byte('5');
             serial_envia_byte('5');
@@ -40,7 +42,7 @@ int main() {
         serial_envia_byte('\n');
 #endif
         if (!(--n)) {
-            n = uTsenyal/2;
+            n = N_SENYAL;
         }
         _delay_us(uTS);
     }
