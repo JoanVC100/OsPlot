@@ -2,7 +2,7 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <util/atomic.h>
-#define BAUD 9600
+#define BAUD 1000000
 #define USE_2X 0
 #include <util/setbaud.h>
 
@@ -13,10 +13,10 @@ void serial_obre(void) {
   cua_buida(&cua_rx);
   cua_buida(&cua_tx);
 
-  //UCSR0A = 1 << U2X0;
+  UCSR0A = USE_2X << U2X0;
   UCSR0B = (1 << RXEN0) | (1 << TXEN0) | (1 << RXCIE0);
   UCSR0C = (1 << UCSZ01) | (1 << UCSZ00);
-  UBRR0 = 0;//UBRR_VALUE;
+  UBRR0 = UBRR_VALUE;
 }
 
 void serial_tanca(void) {
