@@ -1,0 +1,8 @@
+**__pycache__
+**.vscode
+**node_modules
+**bundle.js
+**/Rust/target
+**_pb2.py
+
+**build/
