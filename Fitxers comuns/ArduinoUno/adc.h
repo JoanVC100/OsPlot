@@ -24,4 +24,7 @@ int adc_llegeix10(void);
 /* Retorna la lectura de l'ADC. Requereix que s'hagi
    iniciat una lectura. */
 
+void adc_atura(void);
+// Atura l'ADC.
+
 #endif

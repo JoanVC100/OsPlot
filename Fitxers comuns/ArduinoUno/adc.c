@@ -6,9 +6,7 @@
 
 void adc_inicia(adc_pin_t pin, adc_vref_t vref, adc_prescaler_t prescaler) {
   ADMUX |= vref | pin | 1 << ADLAR;
-  ADCSRB = 0; // Deshabilita el 'trigger' automàtic
-  DIDR0 = 255; // Deshabilita tots els bufers digitals dels pins analògics.
-  PORTC = 0; // Deshabilita pull-ups als pins analògics
+  DIDR0 = 0b00111111; // Deshabilita tots els bufers digitals dels pins analògics.
   switch (prescaler) {
     case p2: prescaler = 1;
     case p4: prescaler = 2;
@@ -33,4 +31,11 @@ uint8_t adc_llegeix8(void) {
 int adc_llegeix10(void) {
   while (bit_is_set(ADCSRA, ADSC));
   return (ADCL >> 6) + (ADCH << 2);
+}
+
+void adc_atura(void) {
+  ADCSRA = 0;
+  //ADCSRB = 0;
+  ADMUX = 0;
+  DIDR0 = 0;
 }

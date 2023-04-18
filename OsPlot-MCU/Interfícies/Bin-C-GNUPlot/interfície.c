@@ -10,6 +10,8 @@
 #include <string.h>
 #include <math.h>
 
+#include "OsPlot-MCU.h"
+
 //#define DEBUG
 
 #define BYTE_ESCAPAMENT 128
@@ -63,7 +65,12 @@ int main(int argc, char* argv[]) {
 #else
         system("gnuplot plot_debug.gnu &");
 #endif
-        port = fopen(s_port, "rb");
+        port = fopen(s_port, "r+b");
+        sleep(4);
+        uint8_t s[1] = {C_PC_INICIA_TRIGGER};
+        fwrite(s, sizeof(uint8_t), 1, port);
+        fread(s, sizeof(uint8_t), 1, port);
+        printf("%d", s[0]);
 
         uint8_t dades[N_MAXIM_MOSTRES];
         while (1) {
@@ -71,6 +78,7 @@ int main(int argc, char* argv[]) {
             size_t i = 0;
             do {
                 c = getc(port);
+                printf("%d",c);
                 if (c == BYTE_ESCAPAMENT) {
                     cnext = getc(port);
                     if (cnext != BYTE_ESCAPAMENT) break;

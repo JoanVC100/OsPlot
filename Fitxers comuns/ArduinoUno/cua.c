@@ -9,6 +9,10 @@ void cua_buida(cua_t *const q) {
   }
 }
 
+uint8_t elements_cua(const cua_t *const q) {
+  return q->n_escriptures;
+}
+
 bool cua_es_buida(const cua_t *const q) {
   return (q->n_escriptures == 0);
 }

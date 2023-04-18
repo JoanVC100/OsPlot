@@ -18,6 +18,9 @@ typedef struct {
 void cua_buida(cua_t *const q);
 // Inicialitza i buida la cua.
 
+uint8_t elements_cua(const cua_t *const q);
+// Retorna el nombre d'elements d'una cua.
+
 bool cua_es_buida(const cua_t *const q);
 // Retorna cert si la cua està buida.
 
