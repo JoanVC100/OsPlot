@@ -9,3 +9,5 @@ edition = "2021"
 clap="4.2.4"
 serialport={version = "4.2.0", default-features=false}
 ctrlc="3.2.5"
+nix="0.26.2"
+tempfile="3.5.0"
