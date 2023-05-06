@@ -1,11 +1,11 @@
 use std::fs::File;
 use std::io::{Write, Read};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::channel;
 use std::time::{Duration, Instant};
 use std::thread::{sleep, self};
 
 use clap::{Arg, Command, value_parser};
+
 use nix::unistd;
 use nix::sys::stat;
 use tempfile::tempdir;
@@ -13,59 +13,53 @@ use serialport::{TTYPort};
 
 #[macro_use]
 mod script_plot;
+//mod missatges_mcu;
+//use missatges_mcu::*;
+mod missatges_bucle;
+use missatges_bucle::*;
 
 const BAUDRATE: u32 = 1_000_000;
 const BYTE_ESCAPAMENT: u8 = 128;
 
-enum MsgCapçaleraPC {
-    PCIniciaTrigger = 0,
-    PCCanviarFS,
-    PCRetornaPossiblesFS,
-    PCCanviarNMostres,
-    PCRetornaNMostres
-}
-
-enum MsgCapçaleraMCU {
-    MCUOk = 129,
-    MCUError,
-    MCURetornaFSS,
-    MCURetornaNMostres
-}
-
 #[inline(always)]
 fn bucle_serial(mut port: TTYPort) {
-    let continua_llegint_arc = Arc::new(AtomicBool::new(true));
-    let c = continua_llegint_arc.clone();
-    ctrlc::set_handler(move || {
-        c.clone().store(false, Ordering::Relaxed);
-        println!();
-    }).expect("Error setting Ctrl-C handler");
-    let continua_llegint = continua_llegint_arc.clone();
+    let (tx_bucle_serial, rx_bucle_serial) = channel();
 
-    // Crea el directori i fitxers temporals
+    // Registra un callback per l'esdeveniment de Ctrl-C.
+    let tx = tx_bucle_serial.clone();
+    ctrlc::set_handler(move || {
+        let msg: MsgBucleSerial = MsgBucleSerial::default();
+        tx.send(msg)
+            .expect("S'ha tancat la comunicació amb el bucle serial. No s'ha pogut avisar el Ctrl-C.");
+    }).expect("Error en registrar l'esdeveniment de Ctrl-C.");
+
+    // GNUPlot
+    // Crea el directori i la cua
     let dir_temp = tempdir()
         .expect("No s'ha pogut crear el directori temporal");
     let nom_cua = dir_temp.path().join("osplot.pipe");
     unistd::mkfifo(&nom_cua, stat::Mode::S_IRWXU)
         .expect("No s'ha pogut crear la cua");
+    let nom_script = dir_temp.path().join("plot.gnu");
+    let mut script = File::create(nom_script.clone())
+        .expect("No s'ha pogut obrir el fitxer del script temporal");
+    script.write(script_plot!().as_bytes())
+            .expect("No s'ha pogut escriure el script de GNUPlot");
+    drop(script);
+    
     // Inicia GNUPlot
-    let c = continua_llegint.clone();
     let nom = nom_cua.clone();
     thread::spawn(move || {
-        let nom_script = dir_temp.path().join("plot.gnu");
-        let mut script = File::create(nom_script.clone())
-            .expect("No s'ha pogut obrir el fitxer del script temporal");
-        script.write(script_plot!().as_bytes())
-            .expect("No s'ha pogut escriure el script de GNUPlot");
-        drop(script);
         let mut gnuplot = std::process::Command::new("gnuplot")
             .arg("-e")
-            .arg(format!("cua=\"{}\"", nom.to_str().unwrap().to_string()))
+            .arg(format!("cua=\"{}\"", nom.as_path().display().to_string()))
             .arg(nom_script)
             .spawn()
             .expect("No s'ha pogut obrir GNUPlot");
         gnuplot.wait().unwrap();
-        c.store(false, Ordering::Relaxed);
+        let msg: MsgBucleSerial = MsgBucleSerial::default();
+        tx_bucle_serial.send(msg)
+            .expect("S'ha tancat la comunicació amb el bucle serial. No s'ha pogut avisar la mort de GNUPlot.");
     });
 
     let mut serial_buf: [u8; 1] = [0];
@@ -78,12 +72,25 @@ fn bucle_serial(mut port: TTYPort) {
     let nom_cua = nom_cua.to_str().unwrap();
     #[cfg(debug_assertions)]
     let mut temps_inici = Instant::now();
-    while continua_llegint.load(Ordering::Relaxed) {
+    loop {
+        match rx_bucle_serial.try_recv() {
+            Ok(msg) => {
+                match msg.capçalera  {
+                    CapMsgBucleSerial::ParaLlegir => break
+                }
+            }
+            Err(e) => {
+                if e != std::sync::mpsc::TryRecvError::Empty {
+                    eprintln!("Error al rebre missatge pel canal: {:?}", e);
+                    break;
+                }
+            }
+        }
         match port.read_exact(&mut serial_buf) {
             Ok(_n) => {}
             Err(e) => {
                 if e.kind() != std::io::ErrorKind::TimedOut {
-                    eprintln!("{:?}", e);
+                    eprintln!("Error al llegir byte del port sèrie: {:?}", e);
                     break;
                 }
             }
@@ -94,7 +101,7 @@ fn bucle_serial(mut port: TTYPort) {
                 Ok(_n) => {}
                 Err(e) => {
                     if e.kind() != std::io::ErrorKind::TimedOut {
-                        eprintln!("{:?}", e);
+                        eprintln!("Error al llegir byte del port sèrie: {:?}", e);
                         break;
                     }
                 }
@@ -150,10 +157,10 @@ fn main() {
                             drop(serial_buf);
                             bucle_serial(port);
                         },
-                        Err(e) => eprintln!("{:?}", e),
+                        Err(e) => eprintln!("Error en la primera lectura del port sèrie: {:?}", e),
                     }
                 },
-                Err(e) => eprintln!("{:?}", e),
+                Err(e) => eprintln!("Error en la primera escriptura al port sèrie: {:?}", e),
             }
         }
         Err(e) => {
