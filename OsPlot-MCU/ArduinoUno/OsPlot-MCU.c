@@ -22,7 +22,7 @@ volatile adc_prescaler_t prescaler_adc = DEFECTE_PRESCALER_ADC;
 
 #define NOMBRE_FSS 7
 const adc_prescaler_t prescalers[NOMBRE_FSS] = 
-{p128, p64, p32, p16,p8, p4, p2};
+{p128, p64, p32, p16, p8, p4, p2};
 
 void inline maquina_osplot_mcu(void) {
     msg_capçalera_pc_t capçalera_pc = serial_llegir_byte();
@@ -118,7 +118,6 @@ int main() {
             maquina_osplot_mcu();
             break;
         case e_maquina_trigger:
-            
             maquina_trigger();
             break;
         }
