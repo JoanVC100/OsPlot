@@ -1,3 +1,5 @@
+pub const MAXIM_FSS: usize = 16;
+
 pub enum MsgCapçaleraPC {
     PCIniciaTrigger = 0,
     PCCanviarFS,
