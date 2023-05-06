@@ -4,13 +4,14 @@ CFLAGS=-Wall -std=c17 -Ofast -mmcu=atmega328p -fshort-enums -flto
 CFLAGS+=--param=min-pagesize=0 # Necessari per eliminar avisos a Arch
 LDFLAGS=$(CFLAGS)
 
-tots: build/OsPlot-MCU
+tots: build/OsPlot-MCU build/lectura_adc
 build:
 	mkdir build
 
 build/%: %.c
 	$(CC) $? -o $@ $(CPPFLAGS) $(CDFLAGS) $(LDFLAGS)
 build/OsPlot-MCU: OsPlot-MCU.c OsPlot-MCU.h build/serial.o build/cua.o build/adc.o build/print_num.o
+build/lectura_adc: lectura_adc.c build/serial.o build/cua.o build/adc.o build/print_num.o
 
 build/%.o: %.c
 	make build

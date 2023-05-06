@@ -18,7 +18,7 @@ typedef enum {e_esperant_trigger, e_capturant} estats_trigger_t;
 volatile estats_trigger_t estat_trigger = e_esperant_trigger;
 volatile uint8_t nivell_trigger = DEFECTE_NIVELL_TRIGGER;
 volatile uint16_t n_mostres_finestra = 500;
-volatile adc_prescaler_t prescaler_adc = p128;
+volatile adc_prescaler_t prescaler_adc = DEFECTE_PRESCALER_ADC;
 
 #define NOMBRE_FSS 7
 const adc_prescaler_t prescalers[NOMBRE_FSS] = 

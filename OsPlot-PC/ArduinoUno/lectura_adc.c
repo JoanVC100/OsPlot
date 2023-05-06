@@ -21,7 +21,7 @@ int main() {
 #endif
 
 #ifdef ENVIA_BIN
-    serial_llegir();
+    serial_llegir_byte();
     serial_envia_4byte(ADC_CALCULA_FS(PRESCALER_ADC));
 #else
     print_num_dec6(ADC_CALCULA_FS(PRESCALER_ADC));
