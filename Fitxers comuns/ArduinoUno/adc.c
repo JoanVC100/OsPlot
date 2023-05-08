@@ -8,13 +8,13 @@ void adc_inicia(adc_pin_t pin, adc_vref_t vref, adc_prescaler_t prescaler) {
   ADMUX |= vref | pin | 1 << ADLAR;
   DIDR0 = 0b00111111; // Deshabilita tots els bufers digitals dels pins analògics.
   switch (prescaler) {
-    case p2: prescaler = 1;
-    case p4: prescaler = 2;
-    case p8: prescaler = 3;
-    case p16: prescaler = 4;
-    case p32: prescaler = 5;
-    case p64: prescaler = 6;
-    default: prescaler = 7;
+    case p2: prescaler = 1; break;
+    case p4: prescaler = 2; break;
+    case p8: prescaler = 3; break;
+    case p16: prescaler = 4; break;
+    case p32: prescaler = 5; break;
+    case p64: prescaler = 6; break;
+    default: prescaler = 7; break;
   }
   ADCSRA |= (1 << ADEN) | prescaler;
 }
