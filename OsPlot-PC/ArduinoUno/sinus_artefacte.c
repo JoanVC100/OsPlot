@@ -18,7 +18,7 @@ int main() {
 
 #ifdef ENVIA_BIN
     serial_llegir_byte();
-    serial_envia_4byte(SINUS_FS);
+    serial_envia_4byte((uint8_t*) &fs);
 #else
     print_num_dec6(SINUS_FS);
 #endif

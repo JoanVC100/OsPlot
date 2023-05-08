@@ -8,7 +8,7 @@
 #define uTS 20
 #define uTsenyal 10000
 
-#define FS 1000000/uTS
+const float fs = 1000000/uTS;
 
 #define N_SENYAL uTsenyal/uTS
 
@@ -18,7 +18,7 @@ int main() {
 
 #ifdef ENVIA_BIN
     serial_llegir_byte();
-    serial_envia_4byte(FS);
+    serial_envia_4byte((uint8_t*) &fs);
 #else
     print_num_dec6(FS);
 #endif

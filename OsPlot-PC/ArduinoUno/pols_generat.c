@@ -11,6 +11,7 @@
 //#define DEBUG
 
 #define PRESCALER_ADC p128
+const float fs = ADC_CALCULA_FS(PRESCALER_ADC);
 
 #define PRESCALER_TIMER 256UL
 #define FREQ_POLS 100UL
@@ -49,7 +50,7 @@ int main() {
 
 #ifdef ENVIA_BIN
     serial_llegir_byte();
-    serial_envia_4byte(ADC_CALCULA_FS(PRESCALER_ADC));
+    serial_envia_4byte((uint8_t*) &fs);
 #else
     print_num_dec6(ADC_CALCULA_FS(PRESCALER_ADC));
 #endif

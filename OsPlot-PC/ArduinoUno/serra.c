@@ -9,7 +9,7 @@
 #define uTS 20
 #define VALOR_MAXIM 255
 
-#define FS 1000000/uTS
+const float fs = 1000000/uTS;
 
 int main() {
     serial_obre();
@@ -17,7 +17,7 @@ int main() {
 
 #ifdef ENVIA_BIN
     serial_llegir_byte();
-    serial_envia_4byte(FS);
+    serial_envia_4byte((uint8_t*) &fs);
 #else
     print_num_dec6(FS);
 #endif

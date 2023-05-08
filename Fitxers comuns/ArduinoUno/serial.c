@@ -64,18 +64,18 @@ void serial_envia_byte(uint8_t b) {
   UCSR0B |= (1  << UDRIE0);
 }
 
-void serial_envia_2byte(uint16_t b) {
+void serial_envia_2byte(uint8_t* b) {
   while(cua_es_plena(&cua_tx));
   for (uint8_t c = 0; c <= 1; c++) {
-    cua_posa(&cua_tx, ((uint8_t*) &b)[c]);
+    cua_posa(&cua_tx, b[c]);
   }
   UCSR0B |= (1  << UDRIE0);
 }
 
-void serial_envia_4byte(uint32_t b) {
+void serial_envia_4byte(uint8_t* b) {
   while(cua_es_plena(&cua_tx));
   for (uint8_t c = 0; c <= 3; c++) {
-    cua_posa(&cua_tx, ((uint8_t*) &b)[c]);
+    cua_posa(&cua_tx, b[c]);
   }
   UCSR0B |= (1  << UDRIE0);
 }
