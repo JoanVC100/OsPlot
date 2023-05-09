@@ -63,6 +63,14 @@ fn bucle_serial(mut port: TTYPort, mut fs: FreqMostreig, mut factor_oversampling
             .expect("S'ha tancat la comunicació amb el bucle serial. No s'ha pogut avisar la mort de GNUPlot.");
     });
 
+    let (tx_frames, rx_frames) = channel();
+    thread::spawn(move || {
+        loop {
+            sleep(Duration::from_millis(17));
+            tx_frames.send(0).unwrap();
+        }
+    });
+
     let mut serial_buf: [u8; 1] = [0];
     let mut vector_dades: [u8; 1000] = [0; 1000];
     let mut vector_temps: [f32; 1000] = [0.; 1000];
@@ -114,12 +122,15 @@ fn bucle_serial(mut port: TTYPort, mut fs: FreqMostreig, mut factor_oversampling
                     temps_inici.elapsed().as_millis());
                     temps_inici = Instant::now();
                 }
-                let mut file = File::create(nom_cua)
-                    .expect("No s'ha pogut obrir la cua");
-                for c in 0..index_dades {
-                    file.write(&vector_temps[c].to_le_bytes()).unwrap();
-                    file.write(&[vector_dades[c]]).unwrap();
+                if rx_frames.try_recv().is_ok() {
+                    let mut file = File::create(nom_cua)
+                    .   expect("No s'ha pogut obrir la cua");
+                    for c in 0..index_dades {
+                        file.write(&vector_temps[c].to_le_bytes()).unwrap();
+                        file.write(&[vector_dades[c]]).unwrap();
+                    }
                 }
+                
                 index_dades = 0;
             }
             else { index_dades += 1 }
