@@ -7,22 +7,17 @@
 
 #include "OsPlot-MCU.h"
 
-
 typedef enum {e_esperant_ordres, e_maquina_trigger} estats_osplot_mcu_t;
 volatile estats_osplot_mcu_t estat_osplot_mcu = e_esperant_ordres;
 
-#define BYTE_ESCAPAMENT 128
 #define DEFECTE_NIVELL_TRIGGER 128
-#define DEFECTE_PRESCALER_ADC p128
+#define PRESCALER_ADC p16
 typedef enum {e_esperant_trigger, e_capturant} estats_trigger_t;
 volatile estats_trigger_t estat_trigger = e_esperant_trigger;
 volatile uint8_t nivell_trigger = DEFECTE_NIVELL_TRIGGER;
 volatile uint16_t n_mostres_finestra = 500;
-volatile adc_prescaler_t prescaler_adc = DEFECTE_PRESCALER_ADC;
-
-#define NOMBRE_FSS 7
-const adc_prescaler_t prescalers[NOMBRE_FSS] = 
-{p128, p64, p32, p16, p8, p4, p2};
+volatile uint8_t factor_oversampling = 1;
+const float fs = F_CPU/PRESCALER_ADC/13.;
 
 void inline maquina_osplot_mcu(void) {
     msg_capçalera_pc_t capçalera_pc = serial_llegir_byte();
@@ -32,38 +27,79 @@ void inline maquina_osplot_mcu(void) {
         serial_envia_byte(C_MCU_OK);
         estat_osplot_mcu = e_maquina_trigger;
         break;
-    case C_PC_CANVIAR_FS:
-        tramesa.index_fs = serial_llegir_byte();
-        if (tramesa.index_fs < NOMBRE_FSS) {
-            prescaler_adc = prescalers[tramesa.index_fs];
+    case C_PC_CANVIAR_FACTOR_OVERSAMPLING:
+        tramesa.factor_oversampling = serial_llegir_byte();
+        if (tramesa.factor_oversampling <= MAXIM_OVERSAMPLING) {
+            n_mostres_finestra = tramesa.n_mostres;
             serial_envia_byte(C_MCU_OK);
         }
         else serial_envia_byte(C_MCU_ERROR);
         break;
-    case C_PC_RETORNA_POSSIBLES_FS:
-        serial_envia_byte(C_MCU_RETORNA_FSS);
-        for (uint8_t c = 0; c < NOMBRE_FSS; c++) {
-            serial_envia_4byte(ADC_CALCULA_FS(prescalers[c]));
-        }
-        serial_envia_4byte(FINAL_FSS);
+    case C_PC_RETORNA_FACTOR_OVERSAMPLING:
+        serial_envia_byte(C_MCU_OK);
+        serial_envia_byte(factor_oversampling);
+        break;
+    case C_PC_RETORNA_FS:
+        serial_envia_byte(C_MCU_OK);
+        serial_envia_4byte((uint8_t*) &fs);
         break;
     case C_PC_CANVIAR_N_MOSTRES:
         tramesa.n_mostres = serial_llegir_2byte();
-        if (tramesa.n_mostres <= 1000) {
+        if (tramesa.n_mostres <= MAXIM_N_MOSTRES) {
             n_mostres_finestra = tramesa.n_mostres;
             serial_envia_byte(C_MCU_OK);
         }
         else serial_envia_byte(C_MCU_ERROR);
         break;
     case C_PC_RETORNA_N_MOSTRES:
-        serial_envia_byte(C_MCU_RETORNA_N_MOSTRES);
-        serial_envia_2byte(n_mostres_finestra);
+        serial_envia_byte(C_MCU_OK);
+        serial_envia_2byte((uint8_t*) &n_mostres_finestra);
         break;
     }
 }
 
+void inline maquina_trigger_oversampling(void) {
+    adc_inici_lectura();
+    uint8_t n_lectura, n1_lectura = adc_llegeix8();
+    adc_inici_lectura();
+    uint16_t n_mostres_finestra_actual = n_mostres_finestra;
+    const uint16_t divisor = factor_oversampling;
+    while (estat_osplot_mcu == e_maquina_trigger) {
+        register uint8_t n_oversampling = (uint8_t) divisor;
+        uint16_t mitja = 0;
+        while (n_oversampling--) {
+            mitja += (uint16_t) adc_llegeix8() << 4;
+            adc_inici_lectura();
+        }
+        n_lectura = (uint8_t) ((mitja / divisor) >> 4);
+        switch (estat_trigger) {
+        case e_esperant_trigger:
+            if (n1_lectura <= nivell_trigger && n_lectura >= nivell_trigger) {
+                serial_envia_byte(n_lectura);
+                if (n_lectura == BYTE_ESCAPAMENT)
+                    serial_envia_byte(BYTE_ESCAPAMENT);
+                n_mostres_finestra_actual = n_mostres_finestra-1;
+                estat_trigger = e_capturant;
+            }                    
+            break;
+        case e_capturant:
+            serial_envia_byte(n_lectura);
+            if (n_lectura == BYTE_ESCAPAMENT)
+                serial_envia_byte(BYTE_ESCAPAMENT);
+            if (!(--n_mostres_finestra_actual)) {
+                serial_envia_byte(BYTE_ESCAPAMENT);
+                serial_envia_byte(0);
+                n_mostres_finestra_actual = n_mostres_finestra;
+                estat_trigger = e_esperant_trigger;
+            }
+            break;
+        }
+        n1_lectura = n_lectura;
+    }
+    estat_trigger = e_esperant_trigger;
+}
+
 void inline maquina_trigger(void) {
-    adc_inicia(a5, v5, prescaler_adc);
     adc_inici_lectura();
     uint8_t n_lectura, n1_lectura = adc_llegeix8();
     uint16_t n_mostres_finestra_actual = n_mostres_finestra;
@@ -96,7 +132,6 @@ void inline maquina_trigger(void) {
         n1_lectura = n_lectura;
     }
     estat_trigger = e_esperant_trigger;
-    adc_atura();
 }
 
 void inici_d_ordres(void) {
@@ -108,7 +143,32 @@ void inici_d_ordres(void) {
     }
 }
 
+#define PRESCALER_TIMER 256UL
+#define FREQ_POLS 1000UL
+
+#define VALOR_OCR1A (F_CPU / (2UL*PRESCALER_TIMER*FREQ_POLS) - 1)
+#if VALOR_OCR1A == 0
+    #error "Freqüència o prescaler massa grans"
+#elif VALOR_OCR1A > 65535
+    #error "Freqüència o prescaler massa petits"
+#endif
+
 int main() {
+    ///////////// Timer
+    TCCR1A |= 1 << COM1A0;
+    OCR1A = (uint16_t) VALOR_OCR1A;
+    DDRB |= 1 << PINB1;
+    uint8_t prescaler;
+    switch (PRESCALER_TIMER) {
+        case 1024: prescaler = 0b101; break;
+        case 256: prescaler = 0b100; break;
+        case 64: prescaler = 0b011; break;
+        case 8: prescaler = 0b010; break;
+        default: prescaler = 0b001; break;
+    }
+    TCCR1B |= (1 << WGM12) | prescaler;
+    ////////////////////////////////////////////
+    adc_inicia(a5, v5, PRESCALER_ADC);
     serial_obre();
     sei();
 
@@ -118,7 +178,8 @@ int main() {
             maquina_osplot_mcu();
             break;
         case e_maquina_trigger:
-            maquina_trigger();
+            if (factor_oversampling < 2) maquina_trigger();
+            else maquina_trigger_oversampling();
             break;
         }
     }
