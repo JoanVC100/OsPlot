@@ -7,12 +7,16 @@
 #include <util/setbaud.h>
 
 #include "cua.h"
-static cua_t cua_rx, cua_tx;
+static cua_t cua_rx;
+#ifdef SERIAL_CUA_TX
+static cua_t cua_tx;
+#endif
 
 void serial_obre(void) {
   cua_buida(&cua_rx);
+#ifdef SERIAL_CUA_TX
   cua_buida(&cua_tx);
-
+#endif
   UCSR0A = USE_2X << U2X0;
   UCSR0B = (1 << RXEN0) | (1 << TXEN0) | (1 << RXCIE0);
   UCSR0C = (1 << UCSZ01) | (1 << UCSZ00);
@@ -20,7 +24,9 @@ void serial_obre(void) {
 }
 
 void serial_tanca(void) {
+#ifdef SERIAL_CUA_TX
   while (!cua_es_buida(&cua_tx));
+#endif
   loop_until_bit_is_set(UCSR0A, UDRE0);
   loop_until_bit_is_set(UCSR0A, TXC0);
   UCSR0B &= ~((1 << RXEN0) | (1 << TXEN0) | (1 << RXCIE0));
@@ -41,12 +47,14 @@ ISR(USART_RX_vect, ISR_BLOCK) {
 #endif
 }
 
+#ifdef SERIAL_CUA_TX
 ISR(USART_UDRE_vect, ISR_BLOCK) {
   if ((!cua_es_buida(&cua_tx)))
     UDR0 = cua_treu(&cua_tx);
   else
     UCSR0B &= ~(1  << UDRIE0);
 }
+#endif
 
 uint8_t serial_llegir_byte(void) {
   while (cua_es_buida(&cua_rx));
@@ -59,25 +67,44 @@ uint16_t serial_llegir_2byte(void) {
 }
 
 void serial_envia_byte(uint8_t b) {
+#ifdef SERIAL_CUA_TX
   while(cua_es_plena(&cua_tx));
   cua_posa(&cua_tx, b);
   UCSR0B |= (1  << UDRIE0);
+#else
+  loop_until_bit_is_set(UCSR0A, UDRE0);
+  UDR0 = b;
+#endif
 }
 
 void serial_envia_2byte(uint8_t* b) {
+#ifdef SERIAL_CUA_TX
   while(cua_es_plena(&cua_tx));
   for (uint8_t c = 0; c <= 1; c++) {
     cua_posa(&cua_tx, b[c]);
   }
   UCSR0B |= (1  << UDRIE0);
+#else
+  for (uint8_t c = 0; c <= 1; c++) {
+    loop_until_bit_is_set(UCSR0A, UDRE0);
+    UDR0 = b[c];
+  }
+#endif
 }
 
 void serial_envia_4byte(uint8_t* b) {
+#ifdef SERIAL_CUA_TX
   while(cua_es_plena(&cua_tx));
   for (uint8_t c = 0; c <= 3; c++) {
     cua_posa(&cua_tx, b[c]);
   }
   UCSR0B |= (1  << UDRIE0);
+#else
+  for (uint8_t c = 0; c <= 3; c++) {
+    loop_until_bit_is_set(UCSR0A, UDRE0);
+    UDR0 = b[c];
+  }
+#endif
 }
 
 bool serial_pot_llegir(void) {
@@ -85,5 +112,9 @@ bool serial_pot_llegir(void) {
 }
 
 bool serial_pot_enviar(void) {
+#ifdef SERIAL_CUA_TX
   return !cua_es_plena(&cua_tx);
+#else
+  return UCSR0A && (1 << UDRE0);
+#endif
 }

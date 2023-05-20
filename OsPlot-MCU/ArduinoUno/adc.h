@@ -1,1 +1,0 @@
-../../Fitxers comuns/ArduinoUno/adc.h

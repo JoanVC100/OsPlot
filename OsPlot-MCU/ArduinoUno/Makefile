@@ -1,25 +1,27 @@
-CC=avr-gcc
-CPPFLAGS=-DF_CPU=16000000UL -DSERIAL_RX_CALLBACK
+export CC=avr-gcc
+export CPPFLAGS=-DF_CPU=16000000UL -DSERIAL_RX_CALLBACK #-DSERIAL_CUA_TX
 CFLAGS=-Wall -std=c17 -Ofast -mmcu=atmega328p -fshort-enums -flto
-CFLAGS+=--param=min-pagesize=0 # Necessari per eliminar avisos a Arch
-LDFLAGS=$(CFLAGS)
+export CFLAGS+=--param=min-pagesize=0 # Necessari per eliminar avisos a Arch
 
-tots: build/OsPlot-MCU build/lectura_adc
-build:
-	mkdir build
+BUILDDIR = build
+LIBDIR = "../../Fitxers comuns/ArduinoUno/"
+CFLAGS+= -I$(LIBDIR)
+LDFLAGS=$(CFLAGS) -L$(LIBDIR)
 
-build/%: %.c
-	$(CC) $? -o $@ $(CPPFLAGS) $(CDFLAGS) $(LDFLAGS)
-build/OsPlot-MCU: OsPlot-MCU.c OsPlot-MCU.h build/serial.o build/cua.o build/adc.o build/print_num.o
-build/lectura_adc: lectura_adc.c build/serial.o build/cua.o build/adc.o build/print_num.o
+SOURCES = $(patsubst %.c,$(BUILDDIR)/%,$(wildcard *.c))
 
-build/%.o: %.c
-	make build
-	$(CC) -c $< -o $@ $(CPPFLAGS) $(CFLAGS)
-build/serial.o: serial.c serial.h cua.h
-build/cua.o: cua.c cua.h
-build/adc.o: adc.c adc.h
-build/print_num.o: print_num.c print_num.h serial.h
+tots: $(SOURCES)
+
+$(BUILDDIR)/%: %.c OsPlot-MCU.h -losplot
+	@mkdir -p $(BUILDDIR)
+	$(CC) $? -o $@ $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -L$(LIBDIR)
+
+$(BUILDDIR)/%: %.c -losplot
+	@mkdir -p $(BUILDDIR)
+	$(CC) $? -o $@ $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -L$(LIBDIR)
+
+-losplot:
+	$(MAKE) -C $(LIBDIR) libosplot.a
 
 .PHONY: grava_arduino neteja
 PORT ?= /dev/ttyACM0
@@ -33,4 +35,5 @@ else
 endif
 
 neteja:
+	$(MAKE) -C $(LIBDIR) neteja
 	\rm -rf build
