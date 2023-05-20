@@ -11,3 +11,7 @@ serialport={version = "4.2.0", default-features=false}
 ctrlc="3.2.5"
 nix="0.26.2"
 tempfile="3.5.0"
+
+[profile.release]
+lto = true
+opt-level = 2

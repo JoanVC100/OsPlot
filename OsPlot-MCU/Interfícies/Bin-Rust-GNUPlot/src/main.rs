@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{Write, Read};
+use std::io::{Write};
 use std::sync::mpsc::channel;
 use std::time::{Duration, Instant};
 use std::thread::{sleep, self};
@@ -9,7 +9,6 @@ use clap::{Arg, Command, value_parser};
 use nix::unistd;
 use nix::sys::stat;
 use tempfile::tempdir;
-use serialport::{TTYPort};
 
 #[macro_use]
 mod script_plot;
@@ -22,7 +21,9 @@ const BAUDRATE: u32 = 1_000_000;
 const BYTE_ESCAPAMENT: u8 = 128;
 
 #[inline(always)]
-fn bucle_serial(mut port: TTYPort, mut fs: FreqMostreig, mut factor_oversampling: u8) {
+fn bucle_serial(mut port: Port, mut fs: FreqMostreig, mut factor_oversampling: u8) {
+    println!("Fs: {}, Oversampling: {}", fs, factor_oversampling);
+    
     // Crea els canals de comunicació entre fils
     let (tx_bucle_serial, rx_bucle_serial) = channel();
 
@@ -95,7 +96,7 @@ fn bucle_serial(mut port: TTYPort, mut fs: FreqMostreig, mut factor_oversampling
                 }
             }
         }
-        match port.read_exact(&mut serial_buf) {
+        match port.llegeix_1(&mut serial_buf) {
             Ok(_n) => {}
             Err(e) => {
                 if e.kind() != std::io::ErrorKind::TimedOut {
@@ -106,7 +107,7 @@ fn bucle_serial(mut port: TTYPort, mut fs: FreqMostreig, mut factor_oversampling
         }
         vector_dades[index_dades] = serial_buf[0];
         if serial_buf[0] == BYTE_ESCAPAMENT {
-            match port.read_exact(&mut serial_buf) {
+            match port.llegeix_1(&mut serial_buf) {
                 Ok(_n) => {}
                 Err(e) => {
                     if e.kind() != std::io::ErrorKind::TimedOut {
@@ -159,13 +160,14 @@ fn main() {
         .open_native();
 
     match port {
-        Ok(mut port) => {
+        Ok(port) => {
+            let mut port = Port::nou(port);
             sleep(Duration::from_secs(3));
-            let fs = retorna_fs(&mut port)
+            let fs = port.retorna_fs()
                 .expect("No s'ha pogut llegir la freqüència de mostreig");
-            let factor_oversampling = retorna_factor_oversampling(&mut port)
+            let factor_oversampling = port.retorna_factor_oversampling()
                 .expect("No s'ha pogut obtenir el factor d'oversampling inicial");
-            match inicia_trigger(&mut port) {
+            match port.inicia_trigger() {
                 None => bucle_serial(port, fs, factor_oversampling),
                 Some(e) => 
                     eprintln!("Error en iniciar el trigger: {:?}", e)
