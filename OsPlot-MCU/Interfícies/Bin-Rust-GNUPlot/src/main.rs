@@ -6,7 +6,8 @@ use std::thread::{sleep, self};
 
 use clap::{Arg, Command, value_parser};
 
-use nix::unistd;
+use nix::sys::signal::{Signal, self};
+use nix::unistd::{self, Pid};
 use nix::sys::stat;
 use tempfile::tempdir;
 
@@ -48,29 +49,13 @@ fn bucle_serial(mut port: Port, mut fs: FreqMostreig, mut factor_oversampling: u
     script.write(script_plot!().as_bytes())
             .expect("No s'ha pogut escriure el script de GNUPlot");
     drop(script);
-    
-    // Inicia GNUPlot
-    let nom = nom_cua.clone();
-    thread::spawn(move || {
-        let mut gnuplot = std::process::Command::new("gnuplot")
-            .arg("-e")
-            .arg(format!("cua=\"{}\"", nom.as_path().display().to_string()))
-            .arg(nom_script)
-            .spawn()
-            .expect("No s'ha pogut obrir GNUPlot");
-        gnuplot.wait().unwrap();
-        let msg: MsgBucleSerial = MsgBucleSerial::default();
-        tx_bucle_serial.send(msg)
-            .expect("S'ha tancat la comunicació amb el bucle serial. No s'ha pogut avisar la mort de GNUPlot.");
-    });
 
-    let (tx_frames, rx_frames) = channel();
-    thread::spawn(move || {
-        loop {
-            sleep(Duration::from_millis(17));
-            tx_frames.send(0).unwrap();
-        }
-    });
+    let mut gnuplot = std::process::Command::new("gnuplot")
+        .arg("-e")
+        .arg(format!("cua=\"{}\"", nom_cua.as_path().display().to_string()))
+        .arg(nom_script)
+        .spawn()
+        .expect("No s'ha pogut obrir GNUPlot");
 
     let mut serial_buf: [u8; 1] = [0];
     let mut vector_dades: [u8; 1000] = [0; 1000];
@@ -82,6 +67,7 @@ fn bucle_serial(mut port: Port, mut fs: FreqMostreig, mut factor_oversampling: u
     let nom_cua = nom_cua.to_str().unwrap();
     #[cfg(debug_assertions)]
     let mut temps_inici = Instant::now();
+    let mut temps_frames = Instant::now();
     loop {
         match rx_bucle_serial.try_recv() {
             Ok(msg) => {
@@ -123,9 +109,10 @@ fn bucle_serial(mut port: Port, mut fs: FreqMostreig, mut factor_oversampling: u
                     temps_inici.elapsed().as_millis());
                     temps_inici = Instant::now();
                 }
-                if rx_frames.try_recv().is_ok() {
+                if temps_frames.elapsed() > Duration::from_millis(17) {
+                    temps_frames = Instant::now();
                     let mut file = File::create(nom_cua)
-                    .   expect("No s'ha pogut obrir la cua");
+                        .expect("No s'ha pogut obrir la cua");
                     for c in 0..index_dades {
                         file.write(&vector_temps[c].to_le_bytes()).unwrap();
                         file.write(&[vector_dades[c]]).unwrap();
@@ -138,6 +125,10 @@ fn bucle_serial(mut port: Port, mut fs: FreqMostreig, mut factor_oversampling: u
         }
         else { index_dades += 1 };
     }
+    if gnuplot.try_wait().unwrap().is_none() {
+        signal::kill(Pid::from_raw(gnuplot.id().try_into().unwrap()), Signal::SIGINT).unwrap();
+    }
+    gnuplot.wait().unwrap();
 }
 
 fn main() {
