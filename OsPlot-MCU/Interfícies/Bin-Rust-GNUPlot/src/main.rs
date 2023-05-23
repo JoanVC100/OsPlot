@@ -57,9 +57,9 @@ fn bucle_serial(mut port: Port, mut fs: FreqMostreig, mut factor_oversampling: u
         .spawn()
         .expect("No s'ha pogut obrir GNUPlot");
 
-    let mut serial_buf: [u8; 1] = [0];
-    let mut vector_dades: [u8; 1000] = [0; 1000];
-    let mut vector_temps: [f32; 1000] = [0.; 1000];
+        let mut serial_buf: [u8; 1] = [0];
+        let mut vector_dades: [u8; 1000] = [0; 1000];
+        let mut vector_temps: [f32; 1000] = [0.; 1000];
     for c in 0..1000 {
         vector_temps[c] = (c as f32) * (factor_oversampling as f32) / fs;
     }
@@ -153,7 +153,6 @@ fn main() {
     match port {
         Ok(port) => {
             let mut port = Port::nou(port);
-            sleep(Duration::from_secs(3));
             let fs = port.retorna_fs()
                 .expect("No s'ha pogut llegir la freqüència de mostreig");
             let factor_oversampling = port.retorna_factor_oversampling()

@@ -1,13 +1,11 @@
 use std::io::{Write, Read, ErrorKind, BufReader, self};
 
 use std::io::Error;
-use std::mem::{self, MaybeUninit};
-use serialport::TTYPort;
+use serialport::{TTYPort};
 
-pub const MAXIM_FSS: usize = 16;
 pub type FreqMostreig = f32;
 
-pub enum MsgCapçaleraPC {
+enum MsgCapçaleraPC {
     PCIniciaTrigger = 0,
     PCCanviarFactorOversampling,
     PCRetornaFactorOversampling,
@@ -15,7 +13,7 @@ pub enum MsgCapçaleraPC {
     PCCanviarNMostres,
     PCRetornaNMostres
 }
-pub enum MsgCapçaleraMCU {
+enum MsgCapçaleraMCU {
     MCUOk = 129,
     MCUError
 }
@@ -28,92 +26,87 @@ pub struct Port {
 impl Port {
     pub fn nou(port: TTYPort) -> Self {
         let port_escriptura = port.try_clone_native().unwrap();
-        let port_lectura = BufReader::new(port);
+        let mut port_lectura = BufReader::new(port);
+        let mut buf = vec![0u8; 1000];
+        let mut intents = 5;
+        while let Err(e) = port_lectura.read_exact(&mut buf) {
+            if e.kind() != std::io::ErrorKind::TimedOut {
+                panic!("Error al llegir byte del port sèrie: {:?}", e);
+            }
+            else if intents == 0 {
+                break;
+            }
+            intents -= 1;
+        }
         return Self{e: port_escriptura, l: port_lectura};
     }
 
-    pub fn llegeix_1(&mut self, serial_buf: &mut [u8; 1]) -> io::Result<()>  {
-        return self.l.read_exact(serial_buf);
+    pub fn llegeix_1(&mut self, serial_buf_rx: &mut [u8; 1]) -> io::Result<()>  {
+        return self.l.read_exact(serial_buf_rx);
     }
 
-    fn llegir_bytes<const N: usize>(&mut self) -> Result<[u8; N], Error> {
-        #[allow(invalid_value)] // L'array sempre estarà inicialitzada si es retorna
-        let mut serial_buf =
-            unsafe { mem::transmute::<_, [u8; N]>(MaybeUninit::<[u8; N]>::uninit().assume_init()) };
-        match self.l.read_exact(&mut serial_buf) {
-            Ok(_) => Ok(serial_buf),
-            Err(e) => Err(e)
-        }
-    }
-
-    #[inline(always)]
-    fn escriu_bytes<const N: usize>(&mut self, serial_buf: [u8; N]) -> Result<(), Error> {
-        return self.e.write_all(&serial_buf);
-    }
-
-    fn escriu_1_llegeix(&mut self, capçalera: u8) -> Option<Error> {
-        match self.escriu_bytes::<1>([capçalera as u8]) {
-            Ok(_) => (),
-            Err(e) => return Some(e)
-        }
-        return match self.llegir_bytes::<1>() {
-            Ok(byte_llegit) => {
-                if byte_llegit[0] != MsgCapçaleraMCU::MCUOk as u8 {
-                    Some(Error::from(ErrorKind::InvalidData))
-                }
-                else { None }
+    fn escriu_i_llegeix_confirmació(&mut self, serial_buf_tx: &[u8], serial_buf_rx: &mut [u8]) -> Option<Error> {
+        self.e.write(serial_buf_tx).unwrap();
+        while let Err(e) = self.l.read_exact(&mut serial_buf_rx[..1]) {
+            if e.kind() != std::io::ErrorKind::TimedOut {
+                panic!("Error al llegir byte del port sèrie: {:?}", e);
             }
-            Err(e) => return Some(e)
         }
+        println!("{:?}", serial_buf_rx);
+        if serial_buf_rx[0] == MsgCapçaleraMCU::MCUOk as u8 { return None; }
+        return Some(Error::from(ErrorKind::InvalidData));
     }
 
-    fn escriu_1_llegeix_n<const N: usize>(&mut self, capçalera: u8) -> Result<[u8; N], Error> {
-        return match self.escriu_1_llegeix(capçalera) {
-            None => self.llegir_bytes::<N>(),
-            Some(e) => return Err(e)
-        }
-    }
-
-    fn escriu_n_llegeix_1<const N: usize>(&mut self, capçalera: u8, dades: [u8; N]) -> Option<Error> {
-        match self.escriu_bytes::<1>([capçalera]) {
-            Ok(_) => (),
-            Err(e) => return Some(e)
-        }
-        return match self.escriu_bytes::<N>(dades) {
-            Ok(_) => {
-                match self.llegir_bytes::<1>() {
-                    Ok(byte_llegit) => {
-                        if byte_llegit[0] != MsgCapçaleraMCU::MCUOk as u8 {
-                            Some(Error::from(ErrorKind::InvalidData))
-                        }
-                        else { None }
-                    }
-                    Err(e) => Some(e)
-                }
+    fn llegeix_parametre(&mut self, serial_buf_rx: &mut [u8]) -> Option<Error> {
+        while let Err(e) = self.l.read_exact(serial_buf_rx) {
+            if e.kind() != std::io::ErrorKind::TimedOut {
+                panic!("Error al llegir byte del port sèrie: {:?}", e);
             }
-            Err(e) => Some(e)
         }
+        return None;
     }
 
     pub fn inicia_trigger(&mut self) -> Option<Error> {
-        return self.escriu_1_llegeix(MsgCapçaleraPC::PCIniciaTrigger as u8);
+        let mut serial_buf_rx = [0u8];
+        return self.escriu_i_llegeix_confirmació(&[MsgCapçaleraPC::PCIniciaTrigger as u8], &mut serial_buf_rx)
     }
 
     pub fn retorna_fs(&mut self) -> Result<FreqMostreig, Error> {
-        match self.escriu_1_llegeix_n::<4>(MsgCapçaleraPC::PCRetornaFS as u8) {
-            Ok(fs) => Ok(FreqMostreig::from_le_bytes(fs)),
-            Err(e) => Err(e)
+        let mut serial_buf_rx = [0u8; 4];
+        if let Some(e) = self.escriu_i_llegeix_confirmació(&[MsgCapçaleraPC::PCRetornaFS as u8], &mut serial_buf_rx) {
+            return Err(e);
         }
+        if let Some(e) = self.llegeix_parametre(&mut serial_buf_rx) {
+            return Err(e);
+        }
+        return Ok(FreqMostreig::from_le_bytes(serial_buf_rx));
     }
     
     pub fn retorna_factor_oversampling(&mut self) -> Result<u8, Error> {
-        match self.escriu_1_llegeix_n::<1>(MsgCapçaleraPC::PCRetornaFactorOversampling as u8) {
-            Ok(fo) => Ok(u8::from_le_bytes(fo)),
-            Err(e) => Err(e)
+        let mut serial_buf_rx = [0u8; 1];
+        if let Some(e) = self.escriu_i_llegeix_confirmació(&[MsgCapçaleraPC::PCRetornaFactorOversampling as u8], &mut serial_buf_rx) {
+            return Err(e);
         }
+        if let Some(e) = self.llegeix_parametre(&mut serial_buf_rx) {
+            return Err(e);
+        }
+        return Ok(u8::from_le_bytes(serial_buf_rx));
+    }
+
+    pub fn retorna_n_mostres(&mut self) -> Result<u16, Error> {
+        let mut serial_buf_rx = [0u8; 2];
+        if let Some(e) = self.escriu_i_llegeix_confirmació(&[MsgCapçaleraPC::PCRetornaNMostres as u8], &mut serial_buf_rx) {
+            return Err(e);
+        }
+        if let Some(e) = self.llegeix_parametre(&mut serial_buf_rx) {
+            return Err(e);
+        }
+        return Ok(u16::from_le_bytes(serial_buf_rx));
     }
     
     pub fn modifica_factor_oversampling(&mut self, factor_oversampling: u8) -> Option<Error> {
-        return self.escriu_n_llegeix_1::<1>(MsgCapçaleraPC::PCCanviarFactorOversampling as u8, [factor_oversampling]);
+        let serial_buf_tx = [MsgCapçaleraPC::PCCanviarFactorOversampling as u8, factor_oversampling];
+        let mut serial_buf_rx = [0u8];
+        return self.escriu_i_llegeix_confirmació(&serial_buf_tx, &mut serial_buf_rx);
     }
 }
