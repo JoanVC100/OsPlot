@@ -30,7 +30,7 @@ void inline maquina_osplot_mcu(void) {
     case C_PC_CANVIAR_FACTOR_OVERSAMPLING:
         tramesa.factor_oversampling = serial_llegir_byte();
         if (tramesa.factor_oversampling <= MAXIM_OVERSAMPLING) {
-            n_mostres_finestra = tramesa.n_mostres;
+            factor_oversampling = tramesa.factor_oversampling;
             serial_envia_byte(C_MCU_OK);
         }
         else serial_envia_byte(C_MCU_ERROR);
@@ -65,7 +65,7 @@ void inline maquina_trigger_oversampling(void) {
     uint16_t n_mostres_finestra_actual = n_mostres_finestra;
     const uint16_t divisor = factor_oversampling;
     while (estat_osplot_mcu == e_maquina_trigger) {
-        register uint8_t n_oversampling = (uint8_t) divisor;
+        uint8_t n_oversampling = (uint8_t) divisor;
         uint16_t mitja = 0;
         while (n_oversampling--) {
             mitja += (uint16_t) adc_llegeix8() << 4;
@@ -143,31 +143,7 @@ void inici_d_ordres(void) {
     }
 }
 
-#define PRESCALER_TIMER 256UL
-#define FREQ_POLS 1000UL
-
-#define VALOR_OCR1A (F_CPU / (2UL*PRESCALER_TIMER*FREQ_POLS) - 1)
-#if VALOR_OCR1A == 0
-    #error "Freqüència o prescaler massa grans"
-#elif VALOR_OCR1A > 65535
-    #error "Freqüència o prescaler massa petits"
-#endif
-
 int main() {
-    ///////////// Timer
-    TCCR1A |= 1 << COM1A0;
-    OCR1A = (uint16_t) VALOR_OCR1A;
-    DDRB |= 1 << PINB1;
-    uint8_t prescaler;
-    switch (PRESCALER_TIMER) {
-        case 1024: prescaler = 0b101; break;
-        case 256: prescaler = 0b100; break;
-        case 64: prescaler = 0b011; break;
-        case 8: prescaler = 0b010; break;
-        default: prescaler = 0b001; break;
-    }
-    TCCR1B |= (1 << WGM12) | prescaler;
-    ////////////////////////////////////////////
     adc_inicia(a5, v5, PRESCALER_ADC);
     serial_obre();
     sei();
