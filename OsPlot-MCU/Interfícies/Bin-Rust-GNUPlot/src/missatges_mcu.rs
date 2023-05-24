@@ -1,8 +1,11 @@
 use std::io::{Write, Read, ErrorKind, BufReader, self};
 
 use std::io::Error;
+use std::time::Duration;
 use serialport::{TTYPort};
 
+pub const BAUDRATE: u32 = 1_000_000;
+pub const BYTE_ESCAPAMENT: u8 = 128;
 pub type FreqMostreig = f32;
 
 enum MsgCapçaleraPC {
@@ -24,7 +27,14 @@ pub struct Port {
 }
 
 impl Port {
-    pub fn nou(port: TTYPort) -> Self {
+    pub fn nou(port_name: &String) -> Result<Self, Error> {
+        let port_resultat = serialport::new(port_name, BAUDRATE)
+            .timeout(Duration::from_millis(400))
+            .open_native();
+        if port_resultat.is_err() {
+            return Err(port_resultat.unwrap_err().into());
+        }
+        let port = port_resultat.unwrap();
         let port_escriptura = port.try_clone_native().unwrap();
         let mut port_lectura = BufReader::new(port);
         let mut buf = vec![0u8; 1000];
@@ -38,7 +48,7 @@ impl Port {
             }
             intents -= 1;
         }
-        return Self{e: port_escriptura, l: port_lectura};
+        return Ok(Self{e: port_escriptura, l: port_lectura});
     }
 
     pub fn llegeix_1(&mut self, serial_buf_rx: &mut [u8; 1]) -> io::Result<()>  {
@@ -52,7 +62,6 @@ impl Port {
                 panic!("Error al llegir byte del port sèrie: {:?}", e);
             }
         }
-        println!("{:?}", serial_buf_rx);
         if serial_buf_rx[0] == MsgCapçaleraMCU::MCUOk as u8 { return None; }
         return Some(Error::from(ErrorKind::InvalidData));
     }

@@ -1,8 +1,7 @@
 use std::fs::File;
 use std::io::{Write};
-use std::sync::mpsc::channel;
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::{Duration, Instant};
-use std::thread::{sleep, self};
 
 use clap::{Arg, Command, value_parser};
 
@@ -18,15 +17,17 @@ use missatges_mcu::*;
 mod missatges_bucle;
 use missatges_bucle::*;
 
-const BAUDRATE: u32 = 1_000_000;
-const BYTE_ESCAPAMENT: u8 = 128;
-
 #[inline(always)]
-fn bucle_serial(mut port: Port, mut fs: FreqMostreig, mut factor_oversampling: u8) {
+fn bucle_serial(mut port: Port, tx_bucle_serial: Sender<MsgBucleSerial>, rx_bucle_serial: Receiver<MsgBucleSerial>) {
+    let fs = port.retorna_fs()
+        .expect("No s'ha pogut llegir la freqüència de mostreig");
+    let factor_oversampling = port.retorna_factor_oversampling()
+        .expect("No s'ha pogut obtenir el factor d'oversampling inicial");
+
+    if let Some(e) = port.inicia_trigger() {
+        panic!("Error en iniciar el trigger: {:?}", e);
+    }
     println!("Fs: {}, Oversampling: {}", fs, factor_oversampling);
-    
-    // Crea els canals de comunicació entre fils
-    let (tx_bucle_serial, rx_bucle_serial) = channel();
 
     // Registra un callback per l'esdeveniment de Ctrl-C.
     let tx = tx_bucle_serial.clone();
@@ -57,9 +58,9 @@ fn bucle_serial(mut port: Port, mut fs: FreqMostreig, mut factor_oversampling: u
         .spawn()
         .expect("No s'ha pogut obrir GNUPlot");
 
-        let mut serial_buf: [u8; 1] = [0];
-        let mut vector_dades: [u8; 1000] = [0; 1000];
-        let mut vector_temps: [f32; 1000] = [0.; 1000];
+    let mut serial_buf: [u8; 1] = [0];
+    let mut vector_dades: [u8; 1000] = [0; 1000];
+    let mut vector_temps: [f32; 1000] = [0.; 1000];
     for c in 0..1000 {
         vector_temps[c] = (c as f32) * (factor_oversampling as f32) / fs;
     }
@@ -146,26 +147,12 @@ fn main() {
 
     let port_name: &String = matches.get_one("port").unwrap();
 
-    let port = serialport::new(port_name, BAUDRATE)
-        .timeout(Duration::from_millis(400))
-        .open_native();
-
-    match port {
-        Ok(port) => {
-            let mut port = Port::nou(port);
-            let fs = port.retorna_fs()
-                .expect("No s'ha pogut llegir la freqüència de mostreig");
-            let factor_oversampling = port.retorna_factor_oversampling()
-                .expect("No s'ha pogut obtenir el factor d'oversampling inicial");
-            match port.inicia_trigger() {
-                None => bucle_serial(port, fs, factor_oversampling),
-                Some(e) => 
-                    eprintln!("Error en iniciar el trigger: {:?}", e)
-            }
-        }
-        Err(e) => {
-            eprintln!("No s'ha pogut obrir \"{}\". Error: {}", port_name, e);
-            std::process::exit(1);
-        }
+    let port_result = Port::nou(port_name);
+    if let Err(e) = port_result {
+        eprintln!("No s'ha pogut obrir \"{}\". Error: {}", port_name, e);
+        std::process::exit(1);
     }
+    // Crea els canals de comunicació entre fils
+    let (tx_bucle_serial, rx_bucle_serial) = channel();
+    bucle_serial(port_result.unwrap(), tx_bucle_serial.clone(), rx_bucle_serial);
 }
