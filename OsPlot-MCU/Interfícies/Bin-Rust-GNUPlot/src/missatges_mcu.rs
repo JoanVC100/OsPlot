@@ -1,6 +1,7 @@
 use std::io::{Write, Read, ErrorKind, BufReader, self};
 
 use std::io::Error;
+use std::thread;
 use std::time::Duration;
 use serialport::{TTYPort};
 
@@ -36,19 +37,9 @@ impl Port {
         }
         let port = port_resultat.unwrap();
         let port_escriptura = port.try_clone_native().unwrap();
-        let mut port_lectura = BufReader::new(port);
-        let mut buf = vec![0u8; 1000];
-        let mut intents = 5;
-        while let Err(e) = port_lectura.read_exact(&mut buf) {
-            if e.kind() != std::io::ErrorKind::TimedOut {
-                panic!("Error al llegir byte del port sèrie: {:?}", e);
-            }
-            else if intents == 0 {
-                break;
-            }
-            intents -= 1;
-        }
-        return Ok(Self{e: port_escriptura, l: port_lectura});
+        let port_lectura = BufReader::new(port);
+        thread::sleep(Duration::from_secs(3));
+        return Ok(Self {e: port_escriptura, l: port_lectura});
     }
 
     pub fn llegeix_1(&mut self, serial_buf_rx: &mut [u8; 1]) -> io::Result<()>  {
@@ -115,6 +106,12 @@ impl Port {
     
     pub fn modifica_factor_oversampling(&mut self, factor_oversampling: u8) -> Option<Error> {
         let serial_buf_tx = [MsgCapçaleraPC::PCCanviarFactorOversampling as u8, factor_oversampling];
+        let mut serial_buf_rx = [0u8];
+        return self.escriu_i_llegeix_confirmació(&serial_buf_tx, &mut serial_buf_rx);
+    }
+
+    pub fn modifica_n_mostres(&mut self, n: u16) -> Option<Error> {
+        let serial_buf_tx = [MsgCapçaleraPC::PCCanviarNMostres as u8, n as u8, (n >> 8) as u8];
         let mut serial_buf_rx = [0u8];
         return self.escriu_i_llegeix_confirmació(&serial_buf_tx, &mut serial_buf_rx);
     }

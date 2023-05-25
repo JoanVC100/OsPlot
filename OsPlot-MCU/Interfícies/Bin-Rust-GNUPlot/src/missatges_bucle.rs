@@ -1,13 +1,14 @@
-pub enum CapMsgBucleSerial {
+pub enum AltresMsgBucleSerial {
     ParaLlegir,
 }
 
-pub struct MsgBucleSerial {
-    pub capçalera: CapMsgBucleSerial,
-    pub valor: u32
+pub enum MsgBucleSerial {
+    Altres(AltresMsgBucleSerial),
+    FactorOversampling(u8),
+    NMostres(u16)
 }
 impl Default for MsgBucleSerial {
     fn default() -> Self {
-        MsgBucleSerial { capçalera: CapMsgBucleSerial::ParaLlegir, valor: 0 }
+        return MsgBucleSerial::Altres(AltresMsgBucleSerial::ParaLlegir);
     }
 }

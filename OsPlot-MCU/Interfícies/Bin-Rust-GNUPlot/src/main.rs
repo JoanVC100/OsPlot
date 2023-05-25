@@ -1,6 +1,7 @@
 use std::fs::File;
-use std::io::{Write};
+use std::io::{Write, self, BufRead};
 use std::sync::mpsc::{channel, Receiver, Sender};
+use std::thread;
 use std::time::{Duration, Instant};
 
 use clap::{Arg, Command, value_parser};
@@ -16,26 +17,23 @@ mod missatges_mcu;
 use missatges_mcu::*;
 mod missatges_bucle;
 use missatges_bucle::*;
+mod parser;
+use parser::*;
+
+const MIDA_BUFFERS: usize = 4096;
 
 #[inline(always)]
-fn bucle_serial(mut port: Port, tx_bucle_serial: Sender<MsgBucleSerial>, rx_bucle_serial: Receiver<MsgBucleSerial>) {
+fn bucle_serial(mut port: Port, rx_bucle_serial: Receiver<MsgBucleSerial>) {
     let fs = port.retorna_fs()
         .expect("No s'ha pogut llegir la freqüència de mostreig");
-    let factor_oversampling = port.retorna_factor_oversampling()
+    let mut factor_oversampling = port.retorna_factor_oversampling()
         .expect("No s'ha pogut obtenir el factor d'oversampling inicial");
+    let mut n_mostres = 0;
 
     if let Some(e) = port.inicia_trigger() {
         panic!("Error en iniciar el trigger: {:?}", e);
     }
     println!("Fs: {}, Oversampling: {}", fs, factor_oversampling);
-
-    // Registra un callback per l'esdeveniment de Ctrl-C.
-    let tx = tx_bucle_serial.clone();
-    ctrlc::set_handler(move || {
-        let msg: MsgBucleSerial = MsgBucleSerial::default();
-        tx.send(msg)
-            .expect("S'ha tancat la comunicació amb el bucle serial. No s'ha pogut avisar el Ctrl-C.");
-    }).expect("Error en registrar l'esdeveniment de Ctrl-C.");
 
     // GNUPlot
     // Crea el directori i la cua
@@ -58,10 +56,10 @@ fn bucle_serial(mut port: Port, tx_bucle_serial: Sender<MsgBucleSerial>, rx_bucl
         .spawn()
         .expect("No s'ha pogut obrir GNUPlot");
 
-    let mut serial_buf: [u8; 1] = [0];
-    let mut vector_dades: [u8; 1000] = [0; 1000];
-    let mut vector_temps: [f32; 1000] = [0.; 1000];
-    for c in 0..1000 {
+    let mut serial_buf = [0u8];
+    let mut vector_dades = [0u8; MIDA_BUFFERS];
+    let mut vector_temps = [0f32; MIDA_BUFFERS];
+    for c in 0..MIDA_BUFFERS {
         vector_temps[c] = (c as f32) * (factor_oversampling as f32) / fs;
     }
     let mut index_dades: usize = 0;
@@ -72,9 +70,26 @@ fn bucle_serial(mut port: Port, tx_bucle_serial: Sender<MsgBucleSerial>, rx_bucl
     loop {
         match rx_bucle_serial.try_recv() {
             Ok(msg) => {
-                match msg.capçalera  {
-                    CapMsgBucleSerial::ParaLlegir => break
+                match msg  {
+                    MsgBucleSerial::Altres(AltresMsgBucleSerial::ParaLlegir) => break,
+                    MsgBucleSerial::FactorOversampling(fo) => {
+                        factor_oversampling = fo;
+                        for c in 0..MIDA_BUFFERS {
+                            vector_temps[c] = (c as f32) * (factor_oversampling as f32) / fs;
+                        }
+                        if let Some(e) = port.modifica_factor_oversampling(factor_oversampling) {
+                            //println!("Error en modificar el factor d'oversampling: {}", e);
+                        }
+                    },
+                    MsgBucleSerial::NMostres(n) => {
+                        n_mostres = n;
+                        if let Some(e) = port.modifica_n_mostres(n_mostres) {
+                            //println!("Error en modificar el nombre de mostres: {}", e);
+                        }
+                    }
                 }
+                index_dades = 0;
+                port.inicia_trigger();
             }
             Err(e) => {
                 if e != std::sync::mpsc::TryRecvError::Empty {
@@ -132,6 +147,11 @@ fn bucle_serial(mut port: Port, tx_bucle_serial: Sender<MsgBucleSerial>, rx_bucl
     gnuplot.wait().unwrap();
 }
 
+struct MsgStdin {
+    str: String,
+    bytes_llegits: usize
+}
+
 fn main() {
     let matches = Command::new("Serialport Example - Receive Data")
         .about("Reads data from a serial port and echoes it to stdout")
@@ -152,7 +172,78 @@ fn main() {
         eprintln!("No s'ha pogut obrir \"{}\". Error: {}", port_name, e);
         std::process::exit(1);
     }
+
     // Crea els canals de comunicació entre fils
     let (tx_bucle_serial, rx_bucle_serial) = channel();
-    bucle_serial(port_result.unwrap(), tx_bucle_serial.clone(), rx_bucle_serial);
+    let (tx_stdin, rx_stdin) = channel();
+
+    // Registra un callback per l'esdeveniment de Ctrl-C.
+    let tx = tx_stdin.clone();
+    ctrlc::set_handler(move || {
+        if tx.send(MsgStdin { str: String::new(), bytes_llegits: 0 }).is_err() {
+            eprintln!("No es pot enviar l'entrada");
+        }
+    }).expect("Error en registrar l'esdeveniment de Ctrl-C.");
+
+    
+    let th_bucle_serial = thread::spawn(move || {
+        bucle_serial(port_result.unwrap(), rx_bucle_serial);
+    });
+
+    thread::spawn(move || {
+        let stdin = io::stdin();
+        loop {
+            let mut entrada = String::new();
+            let bytes_llegits = stdin.lock().read_line(&mut entrada).unwrap();
+            if tx_stdin.send(MsgStdin { str: entrada, bytes_llegits }).is_err() {
+                eprintln!("No es pot enviar l'entrada");
+                break;
+            }
+            if bytes_llegits == 0 { break; }
+        }
+    });
+    
+    loop {
+        let msg_stdin = rx_stdin.recv();
+        if msg_stdin.is_err() {
+            eprintln!("Ha mort el thread de stdin, abortant");
+            tx_bucle_serial.send(MsgBucleSerial::Altres(AltresMsgBucleSerial::ParaLlegir)).unwrap();
+            break;
+        }
+        let msg_stdin = msg_stdin.unwrap();
+        let (entrada, bytes_llegits) = (msg_stdin.str, msg_stdin.bytes_llegits);
+        if bytes_llegits == 1 {
+            continue;
+        }
+        else if bytes_llegits == 0 {
+            if let Err(e) = tx_bucle_serial.send(MsgBucleSerial::Altres(AltresMsgBucleSerial::ParaLlegir)) {
+                eprintln!("Ja s'ha tancat el bucle del serial");
+            }
+            break;
+        }
+
+        let mut ordres = entrada.trim().split(' ');
+        match ordres.next() {
+            Some("os") => {
+                if let Some(factor_oversampling) = ordre_os(&mut ordres) {
+                    let msg: MsgBucleSerial = MsgBucleSerial::FactorOversampling(factor_oversampling);
+                    if tx_bucle_serial.send(msg).is_err() { break; }
+                }
+            }
+            Some("n") => {
+                if let Some(n_mostres) = ordre_n(&mut ordres) {
+                    let msg: MsgBucleSerial = MsgBucleSerial::NMostres(n_mostres);
+                    if tx_bucle_serial.send(msg).is_err() { break; }
+                }
+            }
+            Some("surt") => {
+                if tx_bucle_serial.send(MsgBucleSerial::Altres(AltresMsgBucleSerial::ParaLlegir)).is_err() {
+                    eprintln!("Ja s'ha tancat el bucle del serial");
+                }
+                break;
+            }
+            _ => println!("Ordre invàl·lida"),
+        }
+    }
+    th_bucle_serial.join().unwrap();
 }

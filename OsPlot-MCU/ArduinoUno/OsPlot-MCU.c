@@ -145,6 +145,7 @@ void inici_d_ordres(void) {
 
 int main() {
     adc_inicia(a5, v5, PRESCALER_ADC);
+    serial_rx_callback(inici_d_ordres);
     serial_obre();
     sei();
 
