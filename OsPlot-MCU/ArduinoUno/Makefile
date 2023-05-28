@@ -1,5 +1,5 @@
 export CC=avr-gcc
-export CPPFLAGS=-DF_CPU=16000000UL -DSERIAL_RX_CALLBACK #-DSERIAL_CUA_TX
+export CPPFLAGS=-DF_CPU=16000000UL -DSERIAL_RX_CALLBACK -DBYTE_ESCAPAMENT=128#-DSERIAL_CUA_TX
 CFLAGS=-Wall -std=c17 -Ofast -mmcu=atmega328p -fshort-enums -flto
 export CFLAGS+=--param=min-pagesize=0 # Necessari per eliminar avisos a Arch
 

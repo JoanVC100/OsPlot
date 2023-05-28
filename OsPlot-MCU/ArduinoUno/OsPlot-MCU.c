@@ -23,80 +23,38 @@ void inline maquina_osplot_mcu(void) {
     msg_capçalera_pc_t capçalera_pc = serial_llegir_byte();
     msg_tramesa_t tramesa;
     switch (capçalera_pc) {
-    case C_PC_INICIA_TRIGGER:
-        serial_envia_byte(C_MCU_OK);
+    case PC_INICIA_TRIGGER:
         estat_osplot_mcu = e_maquina_trigger;
         break;
-    case C_PC_CANVIAR_FACTOR_OVERSAMPLING:
+    case PC_CANVIAR_FACTOR_OVERSAMPLING:
         tramesa.factor_oversampling = serial_llegir_byte();
         if (tramesa.factor_oversampling <= MAXIM_OVERSAMPLING) {
             factor_oversampling = tramesa.factor_oversampling;
-            serial_envia_byte(C_MCU_OK);
+            serial_envia_escapament(MCU_FACTOR_OVERSAMPLING_CANVIAT);
         }
-        else serial_envia_byte(C_MCU_ERROR);
+        else serial_envia_escapament(MCU_ERROR);
         break;
-    case C_PC_RETORNA_FACTOR_OVERSAMPLING:
-        serial_envia_byte(C_MCU_OK);
+    case PC_RETORNA_FACTOR_OVERSAMPLING:
         serial_envia_byte(factor_oversampling);
+        serial_envia_escapament(MCU_FACTOR_OVERSAMPLING);
         break;
-    case C_PC_RETORNA_FS:
-        serial_envia_byte(C_MCU_OK);
+    case PC_RETORNA_FS:
         serial_envia_4byte((uint8_t*) &fs);
+        serial_envia_escapament(MCU_FS);
         break;
-    case C_PC_CANVIAR_N_MOSTRES:
+    case PC_CANVIAR_N_MOSTRES:
         tramesa.n_mostres = serial_llegir_2byte();
         if (tramesa.n_mostres <= MAXIM_N_MOSTRES) {
             n_mostres_finestra = tramesa.n_mostres;
-            serial_envia_byte(C_MCU_OK);
+            serial_envia_escapament(MCU_N_MOSTRES_CANVIADES);
         }
-        else serial_envia_byte(C_MCU_ERROR);
+        else serial_envia_escapament(MCU_ERROR);
         break;
-    case C_PC_RETORNA_N_MOSTRES:
-        serial_envia_byte(C_MCU_OK);
+    case PC_RETORNA_N_MOSTRES:
         serial_envia_2byte((uint8_t*) &n_mostres_finestra);
+        serial_envia_escapament(MCU_N_MOSTRES);
         break;
     }
-}
-
-void inline maquina_trigger_oversampling(void) {
-    adc_inici_lectura();
-    uint8_t n_lectura, n1_lectura = adc_llegeix8();
-    adc_inici_lectura();
-    uint16_t n_mostres_finestra_actual = n_mostres_finestra;
-    const uint16_t divisor = factor_oversampling;
-    while (estat_osplot_mcu == e_maquina_trigger) {
-        uint8_t n_oversampling = (uint8_t) divisor;
-        uint16_t mitja = 0;
-        while (n_oversampling--) {
-            mitja += (uint16_t) adc_llegeix8() << 4;
-            adc_inici_lectura();
-        }
-        n_lectura = (uint8_t) ((mitja / divisor) >> 4);
-        switch (estat_trigger) {
-        case e_esperant_trigger:
-            if (n1_lectura <= nivell_trigger && n_lectura >= nivell_trigger) {
-                serial_envia_byte(n_lectura);
-                if (n_lectura == BYTE_ESCAPAMENT)
-                    serial_envia_byte(BYTE_ESCAPAMENT);
-                n_mostres_finestra_actual = n_mostres_finestra-1;
-                estat_trigger = e_capturant;
-            }                    
-            break;
-        case e_capturant:
-            serial_envia_byte(n_lectura);
-            if (n_lectura == BYTE_ESCAPAMENT)
-                serial_envia_byte(BYTE_ESCAPAMENT);
-            if (!(--n_mostres_finestra_actual)) {
-                serial_envia_byte(BYTE_ESCAPAMENT);
-                serial_envia_byte(0);
-                n_mostres_finestra_actual = n_mostres_finestra;
-                estat_trigger = e_esperant_trigger;
-            }
-            break;
-        }
-        n1_lectura = n_lectura;
-    }
-    estat_trigger = e_esperant_trigger;
 }
 
 void inline maquina_trigger(void) {
@@ -111,19 +69,14 @@ void inline maquina_trigger(void) {
         case e_esperant_trigger:
             if (n1_lectura <= nivell_trigger && n_lectura >= nivell_trigger) {
                 serial_envia_byte(n_lectura);
-                if (n_lectura == BYTE_ESCAPAMENT)
-                    serial_envia_byte(BYTE_ESCAPAMENT);
                 n_mostres_finestra_actual = n_mostres_finestra-1;
                 estat_trigger = e_capturant;
             }                    
             break;
         case e_capturant:
             serial_envia_byte(n_lectura);
-            if (n_lectura == BYTE_ESCAPAMENT)
-                serial_envia_byte(BYTE_ESCAPAMENT);
             if (!(--n_mostres_finestra_actual)) {
-                serial_envia_byte(BYTE_ESCAPAMENT);
-                serial_envia_byte(0);
+                serial_envia_escapament(MCU_FINESTRA);
                 n_mostres_finestra_actual = n_mostres_finestra;
                 estat_trigger = e_esperant_trigger;
             }
@@ -131,6 +84,7 @@ void inline maquina_trigger(void) {
         }
         n1_lectura = n_lectura;
     }
+    serial_envia_escapament(MCU_FINESTRA);
     estat_trigger = e_esperant_trigger;
 }
 
@@ -156,7 +110,7 @@ int main() {
             break;
         case e_maquina_trigger:
             if (factor_oversampling < 2) maquina_trigger();
-            else maquina_trigger_oversampling();
+            //else maquina_trigger_oversampling();
             break;
         }
     }

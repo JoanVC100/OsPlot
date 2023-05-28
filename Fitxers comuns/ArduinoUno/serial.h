@@ -24,6 +24,10 @@ void serial_envia_byte(uint8_t b);
 /* Envia un byte pel port sèrie. En cas que la cua sigui plena, es 
    bloqueja fins que el byte es pot posar a la cua. */
 
+void serial_envia_escapament(uint8_t b);
+/* Envia un byte pel port sèrie. En cas que la cua sigui plena, es 
+   bloqueja fins que el byte es pot posar a la cua. */
+
 void serial_envia_2byte(uint8_t* b);
 /* Envia dos bytes pel port sèrie. En cas que la cua sigui plena, es 
    bloqueja fins que els bytes es poden posar a la cua. */
