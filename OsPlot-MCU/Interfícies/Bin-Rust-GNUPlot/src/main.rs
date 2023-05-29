@@ -7,10 +7,18 @@ mod script_plot;
 mod missatges_mcu;
 use missatges_mcu::*;
 mod parser;
+use nix::sys::signal::Signal;
+use nix::sys::{stat, signal};
+use nix::unistd::{self, Pid};
 use parser::*;
+use tempfile::tempdir;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc::{self, Receiver};
+#[derive(Debug)]
 enum MsgBucleSerial {
     IniciaTrigger,
+    ParaTrigger,
     FactorOversampling(u8),
     NMostres(u16)
 }
@@ -34,13 +42,15 @@ impl Default for SValorsOctave {
         return Self {temps: 0., dada: 0}
     }
 }
-impl Debug for SValorsOctave {
+/*impl Debug for SValorsOctave {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("").field("x", &self.temps).field("y", &self.dada).finish()
     }
-}
+}*/
 type ValorsOctave = SValorsOctave;
-
+macro_rules! trenca_bucle {
+    ($str: expr, $err: expr) => { eprintln!($str, $err); break }
+}
 async fn bucle_serial(mut port: Port, mut rx_ordres: Receiver<MsgBucleSerial>) {
     let mut buffer_paquet = Vec::<u8>::with_capacity(4096);
     // Solicita la freqüència de mostreig
@@ -49,7 +59,7 @@ async fn bucle_serial(mut port: Port, mut rx_ordres: Receiver<MsgBucleSerial>) {
         return;
     }
     let paquet = obté_paquet(&mut port, &mut buffer_paquet).await;
-    let Ok(TipusMsgSerial::MCUFs(fs)) = paquet else {
+    let Ok(TipusMsgSerial::MCUFs(mut fs)) = paquet else {
         eprintln!("No s'ha llegit bé la Fs: {:?} {:?}", buffer_paquet, paquet);
         return;
     };
@@ -65,12 +75,37 @@ async fn bucle_serial(mut port: Port, mut rx_ordres: Receiver<MsgBucleSerial>) {
     };
     // Printar els valors inicials
     println!("Freqüència de mostreig: {} Oversampling: {}", fs, factor_oversampling);
+
+    // GNUPlot
+    // Crea el directori i la cua
+    let dir_temp = tempdir()
+        .expect("No s'ha pogut crear el directori temporal");
+    let nom_cua = dir_temp.path().join("osplot.pipe");
+    unistd::mkfifo(&nom_cua, stat::Mode::S_IRWXU)
+        .expect("No s'ha pogut crear la cua");
+    let nom_script = dir_temp.path().join("plot.gnu");
+    let mut script = File::create(nom_script.clone()).await
+        .expect("No s'ha pogut obrir el fitxer del script temporal");
+    script.write(script_plot!().as_bytes()).await
+        .expect("No s'ha pogut escriure el script de GNUPlot");
+    script.flush().await.unwrap();
+    drop(script);
+
+    let mut gnuplot = tokio::process::Command::new("gnuplot")
+        .arg("-e")
+        .arg(format!("cua=\"{}\"", nom_cua.as_path().display().to_string()))
+        .arg(nom_script)
+        .spawn()
+        .expect("No s'ha pogut obrir GNUPlot");
+    let nom_cua = nom_cua.to_str().unwrap();
     
     let mut vector_octave = [ValorsOctave::default(); MIDA_BUFFERS];
-    for c in 0..MIDA_BUFFERS {
-        vector_octave[c].temps = (c as f32) * (factor_oversampling as f32) / fs;
-    }
-
+    let actualitza_temps = |vector_octave: &mut [SValorsOctave; 4096], fs, factor_oversampling, | {
+        for c in 0..MIDA_BUFFERS {
+            vector_octave[c].temps = (c as f32) * (factor_oversampling as f32) / fs;
+        }
+    };
+    actualitza_temps(&mut vector_octave, fs, factor_oversampling);
     if let Some(e) = port.inicia_trigger().await{
         eprintln!("No s'ha pogut iniciar el trigger: {}", e);
         return;
@@ -80,24 +115,20 @@ async fn bucle_serial(mut port: Port, mut rx_ordres: Receiver<MsgBucleSerial>) {
             match msg {
                 MsgBucleSerial::IniciaTrigger => {
                     if let Some(e) = port.inicia_trigger().await{
-                        eprintln!("No s'ha pogut iniciar el trigger: {}", e);
-                        return;
+                        trenca_bucle!("No s'ha pogut iniciar el trigger: {}", e);
                     }
                 }
+                MsgBucleSerial::ParaTrigger => break,
                 MsgBucleSerial::FactorOversampling(fo) => {
                     if let Some(e) = port.canvia_factor_oversampling(fo).await{
-                        eprintln!("No s'ha pogut canviar el factor d'oversampling: {}", e);
-                        return;
+                        trenca_bucle!("No s'ha pogut canviar el factor d'oversampling: {}", e);
                     }
                     factor_oversampling = fo;
-                    for c in 0..MIDA_BUFFERS {
-                        vector_octave[c].temps = (c as f32) * (factor_oversampling as f32) / fs;
-                    }
+                    actualitza_temps(&mut vector_octave, fs, factor_oversampling);
                 }
                 MsgBucleSerial::NMostres(n) => {
                     if let Some(e) = port.canvia_n_mostres(n).await{
-                        eprintln!("No s'ha pogut canviar el número de mostres: {}", e);
-                        return;
+                        trenca_bucle!("No s'ha pogut canviar el número de mostres: {}", e);
                     }
                 }
             }
@@ -111,18 +142,34 @@ async fn bucle_serial(mut port: Port, mut rx_ordres: Receiver<MsgBucleSerial>) {
                 }
                 let vector_octave: &[u8] = unsafe {
                     let ptr = vector_octave.as_ptr() as *const u8;
-                    std::slice::from_raw_parts(ptr, mem::size_of_val(&vector_octave))
+                    std::slice::from_raw_parts(ptr, buffer_paquet.len()*std::mem::size_of::<ValorsOctave>())
                 };
-                println!("{:?}", vector_octave);
+                let mut cua_gnuplot = File::create(nom_cua).await
+                    .expect("No s'ha pogut obrir la cua");
+                cua_gnuplot.write_all( vector_octave).await
+                    .expect("No s'ha pogut escriure a la cua");
+                cua_gnuplot.flush().await.expect("No s'ha pogut acabar d'escriure a la cua");
+                
             }
-            TipusMsgSerial::MCUFactorOversamplingCanviat => println!(""),
-            TipusMsgSerial::MCUFactorOversampling(_) => todo!(),
+            TipusMsgSerial::MCUFactorOversamplingCanviat => println!("Factor d'oversampling canviat"),
+            TipusMsgSerial::MCUFactorOversampling(fo) => {
+                factor_oversampling = fo;
+                actualitza_temps(&mut vector_octave, fs, factor_oversampling);
+            }
             TipusMsgSerial::MCUNMostresCanviades => println!("Mostres canviades"),
-            TipusMsgSerial::MCUNMostres(_) => todo!(),
-            TipusMsgSerial::MCUFs(_) => todo!(),
+            TipusMsgSerial::MCUNMostres(_) => (),
+            TipusMsgSerial::MCUFs(fss) => {
+                fs = fss;
+                actualitza_temps(&mut vector_octave, fs, factor_oversampling);
+            }
             TipusMsgSerial::MCUError => println!("Paquet erroni"),
         }
     }
+    port.solicita_fs().await;
+    if gnuplot.try_wait().unwrap().is_none() {
+        signal::kill(Pid::from_raw(gnuplot.id().unwrap().try_into().unwrap()), Signal::SIGINT).unwrap();
+    }
+    gnuplot.wait().await.unwrap();
 }
 
 #[tokio::main]
