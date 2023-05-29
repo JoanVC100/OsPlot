@@ -14,6 +14,7 @@ use parser::*;
 use tempfile::tempdir;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
+use tokio::select;
 use tokio::sync::mpsc::{self, Receiver};
 #[derive(Debug)]
 enum MsgBucleSerial {
@@ -49,6 +50,7 @@ impl Default for SValorsOctave {
 }*/
 type ValorsOctave = SValorsOctave;
 macro_rules! trenca_bucle {
+    ($str: expr) => { eprintln!($str); break }
     ($str: expr, $err: expr) => { eprintln!($str, $err); break }
 }
 async fn bucle_serial(mut port: Port, mut rx_ordres: Receiver<MsgBucleSerial>) {
@@ -111,58 +113,79 @@ async fn bucle_serial(mut port: Port, mut rx_ordres: Receiver<MsgBucleSerial>) {
         return;
     }
     loop {
-        if let Ok(msg) = rx_ordres.try_recv() {
-            match msg {
-                MsgBucleSerial::IniciaTrigger => {
-                    if let Some(e) = port.inicia_trigger().await{
-                        trenca_bucle!("No s'ha pogut iniciar el trigger: {}", e);
+        let future_gnuplot = gnuplot.wait();
+        select! {
+            _ = future_gnuplot => { // Ha mort el procés durant una escriptura
+                trenca_bucle!("El procés de GNUPlot ha mort. Sortint...");
+            }
+            resultat = rx_ordres.recv() => {
+                if let Some(msg) = resultat {
+                    match msg {
+                        MsgBucleSerial::IniciaTrigger => {
+                            if let Some(e) = port.inicia_trigger().await {
+                                trenca_bucle!("No s'ha pogut iniciar el trigger: {}", e);
+                            }
+                        }
+                        MsgBucleSerial::ParaTrigger => break,
+                        MsgBucleSerial::FactorOversampling(fo) => {
+                            if let Some(e) = port.canvia_factor_oversampling(fo).await {
+                                trenca_bucle!("No s'ha pogut canviar el factor d'oversampling: {}", e);
+                            }
+                            factor_oversampling = fo;
+                            actualitza_temps(&mut vector_octave, fs, factor_oversampling);
+                        }
+                        MsgBucleSerial::NMostres(n) => {
+                            if let Some(e) = port.canvia_n_mostres(n).await {
+                                trenca_bucle!("No s'ha pogut canviar el número de mostres: {}", e);
+                            }
+                        }
                     }
                 }
-                MsgBucleSerial::ParaTrigger => break,
-                MsgBucleSerial::FactorOversampling(fo) => {
-                    if let Some(e) = port.canvia_factor_oversampling(fo).await{
-                        trenca_bucle!("No s'ha pogut canviar el factor d'oversampling: {}", e);
+                else {
+                    println!("S'ha perdut la comunicació amb el mpsc central.");
+                    break;
+                }
+            }
+            resultat_paquet = obté_paquet(&mut port, &mut buffer_paquet) => {
+                let paquet = resultat_paquet.unwrap();
+                match paquet {
+                    TipusMsgSerial::MCUFinestra => {
+                        for (val, &byte) in vector_octave.iter_mut().zip(buffer_paquet.iter()) {
+                            val.dada = byte;
+                        }
+                        let vector_octave: &[u8] = unsafe {
+                            let ptr = vector_octave.as_ptr() as *const u8;
+                            std::slice::from_raw_parts(ptr, buffer_paquet.len()*std::mem::size_of::<ValorsOctave>())
+                        };
+                        let mut cua_gnuplot = File::create(nom_cua).await
+                            .expect("No s'ha pogut obrir la cua");
+                        let future_cua = cua_gnuplot.write_all(vector_octave);
+                        let future_gnuplot = gnuplot.wait();
+                        select! {
+                            resultat = future_cua => {
+                                resultat.expect("No s'ha pogut escriure a la cua");
+                                cua_gnuplot.flush().await.expect("No s'ha pogut acabar d'escriure a la cua");
+                            }
+                            _ = future_gnuplot => { // Ha mort el procés durant una escriptura
+                                println!("El procés de GNUPlot ha mort. Sortint...");
+                                break;
+                            }
+                        }
                     }
-                    factor_oversampling = fo;
-                    actualitza_temps(&mut vector_octave, fs, factor_oversampling);
-                }
-                MsgBucleSerial::NMostres(n) => {
-                    if let Some(e) = port.canvia_n_mostres(n).await{
-                        trenca_bucle!("No s'ha pogut canviar el número de mostres: {}", e);
+                    TipusMsgSerial::MCUFactorOversamplingCanviat => println!("Factor d'oversampling canviat"),
+                    TipusMsgSerial::MCUFactorOversampling(fo) => {
+                        factor_oversampling = fo;
+                        actualitza_temps(&mut vector_octave, fs, factor_oversampling);
                     }
+                    TipusMsgSerial::MCUNMostresCanviades => println!("Mostres canviades"),
+                    TipusMsgSerial::MCUNMostres(_) => (),
+                    TipusMsgSerial::MCUFs(fss) => {
+                        fs = fss;
+                        actualitza_temps(&mut vector_octave, fs, factor_oversampling);
+                    }
+                    TipusMsgSerial::MCUError => println!("Paquet erroni"),
                 }
             }
-        }
-        let resultat_paquet = obté_paquet(&mut port, &mut buffer_paquet).await;
-        let paquet = resultat_paquet.unwrap();
-        match paquet {
-            TipusMsgSerial::MCUFinestra => {
-                for (val, &byte) in vector_octave.iter_mut().zip(buffer_paquet.iter()) {
-                    val.dada = byte;
-                }
-                let vector_octave: &[u8] = unsafe {
-                    let ptr = vector_octave.as_ptr() as *const u8;
-                    std::slice::from_raw_parts(ptr, buffer_paquet.len()*std::mem::size_of::<ValorsOctave>())
-                };
-                let mut cua_gnuplot = File::create(nom_cua).await
-                    .expect("No s'ha pogut obrir la cua");
-                cua_gnuplot.write_all( vector_octave).await
-                    .expect("No s'ha pogut escriure a la cua");
-                cua_gnuplot.flush().await.expect("No s'ha pogut acabar d'escriure a la cua");
-                
-            }
-            TipusMsgSerial::MCUFactorOversamplingCanviat => println!("Factor d'oversampling canviat"),
-            TipusMsgSerial::MCUFactorOversampling(fo) => {
-                factor_oversampling = fo;
-                actualitza_temps(&mut vector_octave, fs, factor_oversampling);
-            }
-            TipusMsgSerial::MCUNMostresCanviades => println!("Mostres canviades"),
-            TipusMsgSerial::MCUNMostres(_) => (),
-            TipusMsgSerial::MCUFs(fss) => {
-                fs = fss;
-                actualitza_temps(&mut vector_octave, fs, factor_oversampling);
-            }
-            TipusMsgSerial::MCUError => println!("Paquet erroni"),
         }
     }
     port.solicita_fs().await;
