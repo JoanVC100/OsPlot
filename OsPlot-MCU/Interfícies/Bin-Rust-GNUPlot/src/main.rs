@@ -1,6 +1,7 @@
 use std::thread;
 use std::fmt::Debug;
 use std::io::{BufReader, BufRead, Error};
+use clap::{Command, Arg, value_parser};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::select;
@@ -202,8 +203,41 @@ async fn bucle_serial(mut port: Port, mut rx_ordres: Receiver<MsgBucleSerial>) {
 
 #[tokio::main]
 async fn main() {
-    let s = "/dev/ttyACM0";
-    let port = Port::nou(&s.to_string()).unwrap();
+    let matches = Command::new("OsPlot MCU CLI")
+        .about("Un oscil·loscopi fet amb Arduino")
+        .disable_version_flag(true)
+        .arg(
+            Arg::new("port")
+                .help("El port on està l'Arduino")
+                .use_value_delimiter(false)
+                .required(true)
+                .value_parser(value_parser!(String))
+        )
+        .get_matches();
+    let port_name: &String = matches.get_one("port").unwrap();
+    let port_result = Port::nou(port_name);
+    if let Err(e) = port_result {
+        eprintln!("No s'ha pogut obrir \"{}\". Error: {}", port_name, e);
+        std::process::exit(1);
+    }
+    let port = port_result.unwrap();
+
+    // Tasca del stdin
+    let mut stdin = BufReader::new(std::io::stdin());
+    let (tx_stdin, mut rx_stdin) = mpsc::channel(8);
+    let tx = tx_stdin.clone();
+    thread::spawn(move || {
+        loop {
+            let mut entrada = String::new();
+            let bytes_llegits = stdin.read_line(&mut entrada).unwrap();
+            tx.blocking_send((entrada, bytes_llegits)).unwrap_or(());
+        }
+    });
+    // Ctrl-C Handler
+    ctrlc::set_handler(move || {
+        tx_stdin.blocking_send(("".to_string(), 0)).unwrap_or(());
+    }).expect("No s'ha pogut instal·lar el handler del Ctrl-C.");
+
     // Bucle del serial
     let (tx_bucle_serial, rx) = mpsc::channel(8);
     let (tx, mut rx_future_bucle_serial) = oneshot::channel();
@@ -211,16 +245,7 @@ async fn main() {
         bucle_serial(port, rx).await;
         tx.send(0).expect("S'ha tancat la comunicació entre el bucle i el loop principal.");
     });
-    // Tasca del stdin
-    let mut stdin = BufReader::new(std::io::stdin());
-    let (tx_stdin, mut rx_stdin) = mpsc::channel(8);
-    thread::spawn(move || {
-        loop {
-            let mut entrada = String::new();
-            let bytes_llegits = stdin.read_line(&mut entrada).unwrap();
-            tx_stdin.blocking_send((entrada, bytes_llegits)).unwrap_or(());
-        }
-    });
+
     // Bucle de stdin
     loop {
         select! {
