@@ -48,7 +48,7 @@ pub enum TipusMsgSerial {
     MCUFactorOversampling(u8),
     MCUNMostresCanviades,
     MCUNMostres(u16),
-    MCUFs(f32),
+    MCUFs(FreqMostreig),
     MCUError,
 }
 impl Debug for TipusMsgSerial {
@@ -136,7 +136,7 @@ impl Port {
                             MsgCapçaleraMCU::MCUFactorOversampling => TipusMsgSerial::MCUFactorOversampling(buf_retorn[0]),
                             MsgCapçaleraMCU::MCUNMostresCanviades => TipusMsgSerial::MCUNMostresCanviades,
                             MsgCapçaleraMCU::MCUNMostres => TipusMsgSerial::MCUNMostres(u16::from_le_bytes([buf_retorn[0], buf_retorn[1]])),
-                            MsgCapçaleraMCU::MCUFs => TipusMsgSerial::MCUFs(f32::from_le_bytes([buf_retorn[0], buf_retorn[1], buf_retorn[2], buf_retorn[3]])),
+                            MsgCapçaleraMCU::MCUFs => TipusMsgSerial::MCUFs(FreqMostreig::from_le_bytes([buf_retorn[0], buf_retorn[1], buf_retorn[2], buf_retorn[3]])),
                             _ => TipusMsgSerial::MCUError,
                         });
                     }

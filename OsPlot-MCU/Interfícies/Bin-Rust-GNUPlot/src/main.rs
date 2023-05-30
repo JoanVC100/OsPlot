@@ -1,27 +1,31 @@
-use std::mem;
-use std::{time::Duration, io::Error, thread};
+use std::thread;
 use std::fmt::Debug;
+use std::io::{BufReader, BufRead, Error};
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
+use tokio::select;
+use tokio::sync::mpsc::{self, Receiver};
+use tokio::sync::oneshot;
+use nix::sys::signal::Signal;
+use nix::sys::{stat, signal};
+use nix::unistd::{self, Pid};
+use tempfile::tempdir;
+
 
 #[macro_use]
 mod script_plot;
 mod missatges_mcu;
 use missatges_mcu::*;
 mod parser;
-use nix::sys::signal::Signal;
-use nix::sys::{stat, signal};
-use nix::unistd::{self, Pid};
 use parser::*;
-use tempfile::tempdir;
-use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
-use tokio::select;
-use tokio::sync::mpsc::{self, Receiver};
-#[derive(Debug)]
+
+#[derive(Debug, PartialEq)]
 enum MsgBucleSerial {
     IniciaTrigger,
     ParaTrigger,
     FactorOversampling(u8),
-    NMostres(u16)
+    NMostres(u16),
+    OrdreInvàlida
 }
 async fn obté_paquet(port: &mut Port, buffer_paquet: &mut Vec<u8>) -> Result<TipusMsgSerial, Error> {
     let resultat_paquet = port.llegeix_paquet(buffer_paquet).await;
@@ -50,7 +54,7 @@ impl Default for SValorsOctave {
 }*/
 type ValorsOctave = SValorsOctave;
 macro_rules! trenca_bucle {
-    ($str: expr) => { eprintln!($str); break }
+    ($str: expr) => { eprintln!($str); break };
     ($str: expr, $err: expr) => { eprintln!($str, $err); break }
 }
 async fn bucle_serial(mut port: Port, mut rx_ordres: Receiver<MsgBucleSerial>) {
@@ -139,6 +143,7 @@ async fn bucle_serial(mut port: Port, mut rx_ordres: Receiver<MsgBucleSerial>) {
                                 trenca_bucle!("No s'ha pogut canviar el número de mostres: {}", e);
                             }
                         }
+                        MsgBucleSerial::OrdreInvàlida => panic!("No es pot rebre l'enum ordre invàl·lida al bucle"),
                     }
                 }
                 else {
@@ -199,6 +204,75 @@ async fn bucle_serial(mut port: Port, mut rx_ordres: Receiver<MsgBucleSerial>) {
 async fn main() {
     let s = "/dev/ttyACM0";
     let port = Port::nou(&s.to_string()).unwrap();
-    let (tx_bucle_serial, mut rx) = mpsc::channel(8);
-    bucle_serial(port, rx).await;
+    // Bucle del serial
+    let (tx_bucle_serial, rx) = mpsc::channel(8);
+    let (tx, mut rx_future_bucle_serial) = oneshot::channel();
+    let tasca_bucle_serial = tokio::spawn(async {
+        bucle_serial(port, rx).await;
+        tx.send(0).expect("S'ha tancat la comunicació entre el bucle i el loop principal.");
+    });
+    // Tasca del stdin
+    let mut stdin = BufReader::new(std::io::stdin());
+    let (tx_stdin, mut rx_stdin) = mpsc::channel(8);
+    thread::spawn(move || {
+        loop {
+            let mut entrada = String::new();
+            let bytes_llegits = stdin.read_line(&mut entrada).unwrap();
+            tx_stdin.blocking_send((entrada, bytes_llegits)).unwrap_or(());
+        }
+    });
+    // Bucle de stdin
+    loop {
+        select! {
+            bytes_llegits = rx_stdin.recv() => {
+                if bytes_llegits.is_none() {
+                    eprintln!("Error inesperat en la stdin.");
+                    break;
+                }
+                let (entrada, bytes_llegits) = bytes_llegits.unwrap_or(("".to_string(), 0));
+                if bytes_llegits == 1 {
+                    continue;
+                }
+                else if bytes_llegits == 0 {
+                    if let Err(_e) = tx_bucle_serial.send(MsgBucleSerial::ParaTrigger).await {
+                        eprintln!("Ja s'ha tancat el bucle del serial");
+                    }
+                    break;
+                }
+                let mut ordres = entrada.trim().split(' ');
+                let mut msg = MsgBucleSerial::OrdreInvàlida;
+                match ordres.next() {
+                    Some("inicia") => {
+                        msg = MsgBucleSerial::IniciaTrigger;
+                    }
+                    Some("os") => {
+                        if let Some(factor_oversampling) = ordre_os(&mut ordres) {
+                            msg = MsgBucleSerial::FactorOversampling(factor_oversampling);
+                        }
+                    }
+                    Some("n") => {
+                        if let Some(n_mostres) = ordre_n(&mut ordres) {
+                            msg = MsgBucleSerial::NMostres(n_mostres);
+                        }
+                    }
+                    Some("surt") => {
+                        if tx_bucle_serial.send(MsgBucleSerial::ParaTrigger).await.is_err() {
+                            eprintln!("Ja s'ha tancat el bucle del serial");
+                        }
+                        break;
+                    }
+                    _ => println!("Ordre invàl·lida"),
+                }
+                if msg != MsgBucleSerial::OrdreInvàlida {
+                    if tx_bucle_serial.send(msg).await.is_err() { break; }
+                }
+            }
+            _ = &mut rx_future_bucle_serial => {
+                break;
+            }
+        }
+    }
+    if tx_bucle_serial.send(MsgBucleSerial::ParaTrigger).await.is_ok() {
+        tasca_bucle_serial.await.unwrap();
+    }
 }
