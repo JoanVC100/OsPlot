@@ -12,10 +12,6 @@ static cua_t cua_rx;
 static cua_t cua_tx;
 #endif
 
-#ifndef BYTE_ESCAPAMENT
-#error "No s'ha definit byte d'escapament"
-#endif
-
 void serial_obre(void) {
   cua_buida(&cua_rx);
 #ifdef SERIAL_CUA_TX
@@ -75,20 +71,25 @@ void serial_envia_byte(uint8_t b) {
   while(cua_es_plena(&cua_tx));
   cua_posa(&cua_tx, b);
   UCSR0B |= (1  << UDRIE0);
+  #ifdef BYTE_ESCAPAMENT
   if (b == BYTE_ESCAPAMENT) {
     while(cua_es_plena(&cua_tx));
     cua_posa(&cua_tx, b);
   }
+  #endif
 #else
   loop_until_bit_is_set(UCSR0A, UDRE0);
   UDR0 = b;
+  #ifdef BYTE_ESCAPAMENT
   if (b == BYTE_ESCAPAMENT) {
     loop_until_bit_is_set(UCSR0A, UDRE0);
     UDR0 = b;
   }
+  #endif
 #endif
 }
 
+#ifdef BYTE_ESCAPAMENT
 void serial_envia_escapament(uint8_t b) {
 #ifdef SERIAL_CUA_TX
   while(cua_es_plena(&cua_tx));
@@ -103,26 +104,31 @@ void serial_envia_escapament(uint8_t b) {
   UDR0 = b;
 #endif
 }
+#endif
 
 void serial_envia_2byte(uint8_t* b) {
 #ifdef SERIAL_CUA_TX
   for (uint8_t c = 0; c <= 1; c++) {
     while(cua_es_plena(&cua_tx));
     cua_posa(&cua_tx, b[c]);
+    #ifdef BYTE_ESCAPAMENT
     if (b[c] == BYTE_ESCAPAMENT) {
       while(cua_es_plena(&cua_tx));
       cua_posa(&cua_tx, b[c]);
     }
+    #endif
   }
   UCSR0B |= (1  << UDRIE0);
 #else
   for (uint8_t c = 0; c <= 1; c++) {
     loop_until_bit_is_set(UCSR0A, UDRE0);
     UDR0 = b[c];
+    #ifdef BYTE_ESCAPAMENT
     if (b[c] == BYTE_ESCAPAMENT) {
       loop_until_bit_is_set(UCSR0A, UDRE0);
     UDR0 = b[c];
     }
+    #endif
   }
 #endif
 }
@@ -132,20 +138,24 @@ void serial_envia_4byte(uint8_t* b) {
   for (uint8_t c = 0; c <= 3; c++) {
     while(cua_es_plena(&cua_tx));
     cua_posa(&cua_tx, b[c]);
+    #ifdef BYTE_ESCAPAMENT
     if (b[c] == BYTE_ESCAPAMENT) {
       while(cua_es_plena(&cua_tx));
       cua_posa(&cua_tx, b[c]);
     }
+    #endif
   }
   UCSR0B |= (1  << UDRIE0);
 #else
   for (uint8_t c = 0; c <= 3; c++) {
     loop_until_bit_is_set(UCSR0A, UDRE0);
     UDR0 = b[c];
+    #ifdef BYTE_ESCAPAMENT
     if (b[c] == BYTE_ESCAPAMENT) {
       loop_until_bit_is_set(UCSR0A, UDRE0);
     UDR0 = b[c];
     }
+    #endif
   }
 #endif
 }
