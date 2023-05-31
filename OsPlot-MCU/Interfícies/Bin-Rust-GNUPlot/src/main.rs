@@ -162,25 +162,27 @@ async fn bucle_serial(mut port: Port, mut rx_ordres: Receiver<MsgBucleSerial>) {
                 let paquet = resultat_paquet.unwrap();
                 match paquet {
                     TipusMsgSerial::MCUFinestra => {
-                        for (val, &byte) in vector_octave.iter_mut().zip(buffer_paquet.iter()) {
-                            val.dada = byte;
-                        }
-                        let vector_octave: &[u8] = unsafe {
-                            let ptr = vector_octave.as_ptr() as *const u8;
-                            std::slice::from_raw_parts(ptr, buffer_paquet.len()*std::mem::size_of::<ValorsOctave>())
-                        };
-                        let mut cua_gnuplot = File::create(nom_cua).await
-                            .expect("No s'ha pogut obrir la cua");
-                        let future_cua = cua_gnuplot.write_all(vector_octave);
-                        let future_gnuplot = gnuplot.wait();
-                        select! {
-                            resultat = future_cua => {
-                                resultat.expect("No s'ha pogut escriure a la cua");
-                                cua_gnuplot.flush().await.expect("No s'ha pogut acabar d'escriure a la cua");
+                        if buffer_paquet.len() > 0 {
+                            for (val, &byte) in vector_octave.iter_mut().zip(buffer_paquet.iter()) {
+                                val.dada = byte;
                             }
-                            _ = future_gnuplot => { // Ha mort el procés durant una escriptura
-                                println!("El procés de GNUPlot ha mort. Sortint...");
-                                break;
+                            let vector_octave: &[u8] = unsafe {
+                                let ptr = vector_octave.as_ptr() as *const u8;
+                                std::slice::from_raw_parts(ptr, buffer_paquet.len()*std::mem::size_of::<ValorsOctave>())
+                            };
+                            let mut cua_gnuplot = File::create(nom_cua).await
+                                .expect("No s'ha pogut obrir la cua");
+                            let future_cua = cua_gnuplot.write_all(vector_octave);
+                            let future_gnuplot = gnuplot.wait();
+                            select! {
+                                resultat = future_cua => {
+                                    resultat.expect("No s'ha pogut escriure a la cua");
+                                    cua_gnuplot.flush().await.expect("No s'ha pogut acabar d'escriure a la cua");
+                                }
+                                _ = future_gnuplot => { // Ha mort el procés durant una escriptura
+                                    println!("El procés de GNUPlot ha mort. Sortint...");
+                                    break;
+                                }
                             }
                         }
                     }
