@@ -17,6 +17,8 @@ enum MsgCapçaleraPC {
     PCCanviarNMostres,
     PCRetornaNMostres,
     PCRetornaFs,
+    PCCanviarNivellTrigger,
+    PCRetornaNivellTrigger
 }
 
 enum MsgCapçaleraMCU {
@@ -26,18 +28,22 @@ enum MsgCapçaleraMCU {
     MCUNMostresCanviades,
     MCUNMostres,
     MCUFs,
+    MCUNivellTriggerCanviat,
+    MCUNivellTrigger,
     MCUError = 255,
 }
 impl MsgCapçaleraMCU {
     fn try_from(v: u8) -> Result<Self, Error> {
         return match v {
-            129 => Ok(MsgCapçaleraMCU::MCUFinestra),
-            130 => Ok(MsgCapçaleraMCU::MCUFactorOversamplingCanviat),
-            131 => Ok(MsgCapçaleraMCU::MCUFactorOversampling),
-            132 => Ok(MsgCapçaleraMCU::MCUNMostresCanviades),
-            133 => Ok(MsgCapçaleraMCU::MCUNMostresCanviades),
-            134 => Ok(MsgCapçaleraMCU::MCUFs),
-            _ => Ok(MsgCapçaleraMCU::MCUError)
+            129 => Ok(Self::MCUFinestra),
+            130 => Ok(Self::MCUFactorOversamplingCanviat),
+            131 => Ok(Self::MCUFactorOversampling),
+            132 => Ok(Self::MCUNMostresCanviades),
+            133 => Ok(Self::MCUNMostresCanviades),
+            134 => Ok(Self::MCUFs),
+            135 => Ok(Self::MCUNivellTrigger),
+            136 => Ok(Self::MCUNivellTrigger),
+            _ => Ok(Self::MCUError)
         }
     }
 }
@@ -49,7 +55,9 @@ pub enum TipusMsgSerial {
     MCUNMostresCanviades,
     MCUNMostres(u16),
     MCUFs(FreqMostreig),
-    MCUError,
+    MCUNivellTriggerCanviat,
+    MCUNivellTrigger(u8),
+    MCUError
 }
 impl Debug for TipusMsgSerial {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -60,6 +68,8 @@ impl Debug for TipusMsgSerial {
             Self::MCUNMostresCanviades => write!(f, "MCUNMostresCanviades"),
             Self::MCUNMostres(arg0) => f.debug_tuple("MCUNMostres").field(arg0).finish(),
             Self::MCUFs(arg0) => f.debug_tuple("MCUFs").field(arg0).finish(),
+            Self::MCUNivellTriggerCanviat => write!(f, "MCUNivellTriggerCanviat"),
+            Self::MCUNivellTrigger(arg0) => f.debug_tuple("MCUNivellTrigger").field(arg0).finish(),
             Self::MCUError => write!(f, "MCUError"),
         }
     }
@@ -114,6 +124,10 @@ impl Port {
         return self.escriptura(&[MsgCapçaleraPC::PCCanviarNMostres as u8, n as u8, (n >> 8) as u8]).await;
     }
 
+    pub async fn canvia_nivell_trigger(&mut self, t: u8) -> Option<Error> {
+        return self.escriptura(&[MsgCapçaleraPC::PCCanviarNivellTrigger as u8, t]).await;
+    }
+
     pub async fn llegeix_paquet(&mut self, buf_retorn: &mut Vec<u8>) -> Result<TipusMsgSerial, Error> {
         buf_retorn.clear();
         self.serial_buf.clear();
@@ -137,6 +151,8 @@ impl Port {
                             MsgCapçaleraMCU::MCUNMostresCanviades => TipusMsgSerial::MCUNMostresCanviades,
                             MsgCapçaleraMCU::MCUNMostres => TipusMsgSerial::MCUNMostres(u16::from_le_bytes([buf_retorn[0], buf_retorn[1]])),
                             MsgCapçaleraMCU::MCUFs => TipusMsgSerial::MCUFs(FreqMostreig::from_le_bytes([buf_retorn[0], buf_retorn[1], buf_retorn[2], buf_retorn[3]])),
+                            MsgCapçaleraMCU::MCUNivellTriggerCanviat => TipusMsgSerial::MCUNivellTriggerCanviat,
+                            MsgCapçaleraMCU::MCUNivellTrigger => TipusMsgSerial::MCUNivellTrigger(buf_retorn[0]),
                             _ => TipusMsgSerial::MCUError,
                         });
                     }

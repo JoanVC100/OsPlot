@@ -54,6 +54,14 @@ void inline maquina_osplot_mcu(void) {
         serial_envia_2byte((uint8_t*) &n_mostres_finestra);
         serial_envia_escapament(MCU_N_MOSTRES);
         break;
+    case PC_CANVIAR_NIVELL_TRIGGER:
+        nivell_trigger = serial_llegir_byte();
+        serial_envia_escapament(MCU_NIVELL_TRIGGER_CANVIAT);
+        break;
+    case PC_RETORNA_NIVELL_TRIGGER:
+        serial_envia_byte(nivell_trigger);
+        serial_envia_escapament(MCU_NIVELL_TRIGGER);
+        break;
     }
 }
 

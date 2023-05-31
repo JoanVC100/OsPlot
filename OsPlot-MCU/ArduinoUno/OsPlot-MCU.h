@@ -10,6 +10,8 @@ typedef enum {
     PC_CANVIAR_N_MOSTRES,
     PC_RETORNA_N_MOSTRES,
     PC_RETORNA_FS,
+    PC_CANVIAR_NIVELL_TRIGGER,
+    PC_RETORNA_NIVELL_TRIGGER
 } msg_capçalera_pc_t;
 
 typedef enum {
@@ -19,6 +21,8 @@ typedef enum {
     MCU_N_MOSTRES_CANVIADES,
     MCU_N_MOSTRES,
     MCU_FS,
+    MCU_NIVELL_TRIGGER_CANVIAT,
+    MCU_NIVELL_TRIGGER,
     MCU_ERROR = 255
 } msg_capçalera_mcu_t;
 

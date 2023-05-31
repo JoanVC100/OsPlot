@@ -26,6 +26,7 @@ enum MsgBucleSerial {
     ParaTrigger,
     FactorOversampling(u8),
     NMostres(u16),
+    NivellTrigger(u8),
     OrdreInvàlida
 }
 async fn obté_paquet(port: &mut Port, buffer_paquet: &mut Vec<u8>) -> Result<TipusMsgSerial, Error> {
@@ -144,6 +145,11 @@ async fn bucle_serial(mut port: Port, mut rx_ordres: Receiver<MsgBucleSerial>) {
                                 trenca_bucle!("No s'ha pogut canviar el número de mostres: {}", e);
                             }
                         }
+                        MsgBucleSerial::NivellTrigger(t) => {
+                            if let Some(e) = port.canvia_nivell_trigger(t).await {
+                                trenca_bucle!("No s'ha pogut canviar el nivell del trigger: {}", e);
+                            }
+                        }
                         MsgBucleSerial::OrdreInvàlida => panic!("No es pot rebre l'enum ordre invàl·lida al bucle"),
                     }
                 }
@@ -189,6 +195,8 @@ async fn bucle_serial(mut port: Port, mut rx_ordres: Receiver<MsgBucleSerial>) {
                         fs = fss;
                         actualitza_temps(&mut vector_octave, fs, factor_oversampling);
                     }
+                    TipusMsgSerial::MCUNivellTriggerCanviat => println!("Nivell de trigger canviat"),
+                    TipusMsgSerial::MCUNivellTrigger(_) => (),
                     TipusMsgSerial::MCUError => println!("Paquet erroni"),
                 }
             }
@@ -278,6 +286,11 @@ async fn main() {
                     Some("n") => {
                         if let Some(n_mostres) = ordre_n(&mut ordres) {
                             msg = MsgBucleSerial::NMostres(n_mostres);
+                        }
+                    }
+                    Some("tr") => {
+                        if let Some(nivell_trigger) = ordre_tr(&mut ordres) {
+                            msg = MsgBucleSerial::NivellTrigger(nivell_trigger);
                         }
                     }
                     Some("surt") => {
