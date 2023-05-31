@@ -41,7 +41,7 @@ impl MsgCapçaleraMCU {
             132 => Ok(Self::MCUNMostresCanviades),
             133 => Ok(Self::MCUNMostresCanviades),
             134 => Ok(Self::MCUFs),
-            135 => Ok(Self::MCUNivellTrigger),
+            135 => Ok(Self::MCUNivellTriggerCanviat),
             136 => Ok(Self::MCUNivellTrigger),
             _ => Ok(Self::MCUError)
         }
