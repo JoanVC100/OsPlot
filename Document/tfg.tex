@@ -1,0 +1,188 @@
+\documentclass{tfgitic}[2023/06/30]
+% per a fórmules químiques
+\usepackage[version=4]{mhchem}
+% Per dibuixar gràfics: base general i gràfics senzills
+\usepackage{tikz} \usetikzlibrary{arrows}
+% Per dibuixar gràfics: circuits electrònics
+\usepackage[europeanresistors,americaninductors]{circuitikz}
+% Per dibuixar gràfics: diagrames diversos
+\usepackage{pgfplots}
+% Per escriure algoritmes
+\usepackage[plain,figure]{algorithm2e}
+% Per a usar taules elàstiques
+\usepackage{tabularx}
+
+% Indica quines bd bibliografiques usarem
+\addbibresource{tfg.bib}
+
+% Marges en els algoritmes
+\setlength{\algomargin}{4em}
+
+% Versió de pgfplots a usar
+\pgfplotsset{compat=newest}
+
+\definecolor{tufte1}{rgb}{0.7,0.7,0.55}
+\definecolor{yellowmarker}{HTML}{DEF440}
+
+\pgfplotsset{
+	tufte bar/.style={
+		ybar,
+		axis line style={draw opacity=0},
+		xtick=\empty,
+		ymin=0,
+		bar width=3mm,
+		x=2*\pgfkeysvalueof{/pgf/bar width},
+		ymajorgrids,
+		grid style=white,
+		axis on top,
+		major tick length=0pt,
+		cycle list={
+			fill=tufte1, draw=none\\
+		},
+		enlarge x limits={
+			abs=0.5*\pgfkeysvalueof{/pgf/bar width}
+		},
+		axis x line*=bottom,
+		x axis line style={
+			draw opacity=1,
+			tufte1,
+			thick
+		},
+		yticklabel=\pgfmathprintnumber{\tick}\,\%
+	}
+}
+
+\title{OsPlot: Com implementar osci\lgem oscopis amb un microcontrolador i Linux}
+
+\subtitle{Subtítol}
+
+\author{Joan Vilardaga Castro}
+
+\advisor{Francisco Del Aguila López}
+
+\dedication{Dedicació}
+
+\begin{acknowledgments}
+Tot el meu agraïment.
+\end{acknowledgments}
+
+\begin{resum}
+Aquest document descriu una solució anomenada OsPlot, una arquitectura
+genèrica que permet transformar un microcontrolador i un ordinador en
+un osci\lgem oscopi funcional.  Mitjançant l'ús de plataformes obertes
+com Linux, Arduino i GNUPlot, aquesta investigació intenta oferir una
+solució de baix cost i accessible per a gent interessada en l'anàlisi
+de senyals.
+\end{resum}
+
+\begin{abstract}
+This document describes a solution named OsPlot, which is a generic
+architecture that allows transforming a microcontroller and a computer
+into a functional oscilloscope. By using open platforms such as Linux,
+Arduino and GNUPlot, this research aims to provide a low-cost and
+accessible solution for people interested in signal analysis.
+\end{abstract}
+
+\begin{document}
+
+\part{Memòria}
+
+\chapter{Introducció}
+\label{cap:intro}
+
+\section{Origen del treball: Osci\lgem oscopi amb GNUPlot}
+\label{sec:origen}
+
+GNUPlot \cite{gnuplot} és un programa de traçat de gràfics en 2D i 3D
+que permet visualitzar i analitzar diferents conjunts de dades. Tot i
+que GNUPlot és una eina per fer gràfics estàtics, es pot combinar amb
+altres programes o ``scripts'' per aconseguir la funcionalitat de
+traçat en temps real.
+
+És precisament aquest descobriment el que ha obert la porta a la
+possibilitat de fer un osci\lgem oscopi amb GNUPlot com a plataforma
+principal. Així, aquesta investigació s'enfoca a explorar la
+viabilitat d'utilitzar GNUPlot per a la creació d'un osci\lgem oscopi
+digital totalment funcional.
+
+\section{Objectius}
+\label{sec:objectius}
+
+\begin{enumerate}
+	\item Evaluar la capacitat de GNUPlot per visualtizar dades en
+          temps real.
+	\item Desenvolupar i avaluar OsPlot com a solució genèrica per
+          transformar un microcontrolador i un ordinador en un
+          osci\lgem oscopi.
+	\item Implementar programes de referència que explotin les
+          diferents possibilitats de l'arquitectura.
+\end{enumerate}
+
+\section{Com funciona un osci\lgem oscopi}
+\label{sec:com-funciona-oscil·loscopi}
+
+Un osci\lgem oscopi \cite{viqui-oscil·loscopi} és un instrument de
+mesura que s'utilitza per visualitzar i analitzar senyals elèctrics
+variables en el temps. Com amb moltes altres coses, els osci\lgem
+oscopis són instruments que han evolucionat amb la digitalització,
+creant una nova generació d'osci\lgem oscopis més precisos i que poden
+fer operacions molt més complexes com mitges, pic a pic o
+transformades ràpides de Fourier.
+
+\subsection{Funcionament bàsic}
+\label{subsec:funcionament-bàsic}
+
+Els osci\lgem oscopis digitals es basen en l'ús d'un ADC (convertidor
+analògic-digital), un sistema que converteix senyals analògics en
+senyals digitals, les quals es processen per generar una representació
+gràfica en temps real a la pantalla. L'eix horitzontal indica el
+temps, i l'eix vertical indica generalment voltatge (tot i que es
+poden mesurar altres magnituds com el corrent).
+
+Tots els osci\lgem oscopis incorporen un subsistema de ``trigger''
+\cite{funcionament-trigger} que té com a funció establir un punt de
+referència i sincronitzar la captura de les dades. Aquest subsistema
+és essencial per garantir una visualització estable i repetible. Sense
+el ``trigger'', el senyal a visualitzar es desplaçaria constantment a
+través de l'eix horitzontal, fent impossible la seva observació.
+
+\subsection{Conceptes importants de senyals digitals}
+\label{subsec:conceptes-pds}
+
+Com que el treball se centra en osci\lgem oscopis digitals, és
+necessari conèixer alguns dels conceptes claus del processament
+digital del senyal \cite{llibre-pds}:
+
+\begin{itemize}
+	\item Senyal analògic (o continu): Tipus de senyal format per
+          variables contínues. Encara que aquests valors estiguin
+          confinats en un rang màxim i mínim, poden tenir una precisió
+          infinita, no hi ha espais buits.
+	\item Senyal digital (o discret): Seqüència de valors discrets
+          separats en el temps. A diferència dels analògics, els
+          senyals discrets tenen espais buits.
+	\item Quantització: És el procés d'aproximar un valor continu
+          al valor discret més proper. Sigui aproximació o truncament,
+          sol introduir error de mesura, ja que un valor discret no
+          pot representar els infinits decimals d'un valor continu.
+	\item Resolució: És la diferència entre dos valors d'un rang
+          discret. Determina el màxim error de discretització i el
+          nombre de bits d'una mostra.
+	\item Mostreig: Procés que transforma un senyal analògic en un
+          senyal discret mitjançant l'ús repetit de la quantització.
+          Cada valor quantitzat és una mostra del senyal analògic.
+	\item Freqüència de mostreig: El nombre de mostres que captura
+          un ADC cada segon. La màxima freqüència que podrà captar
+          l'osci\lgem oscopi serà com a màxim la meitat de la
+          freqüència de mostreig (criteri de Nyquist).
+\end{itemize}
+
+\printbibliography
+
+\end{document}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% LaTeX-biblatex-use-Biber: t
+%%% End:
