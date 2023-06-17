@@ -177,6 +177,219 @@ digital del senyal \cite{llibre-pds}:
           freqüència de mostreig (criteri de Nyquist).
 \end{itemize}
 
+\chapter{OsPlot}
+
+En aquest capítol primer s'explorarà la manera de convertir GNUPlot en
+una eina per visualitzar dades en temps real. Seguidament, s'intentarà
+dissenyar l'arquitectura més simple d'OsPlot, on una Arduino envia pel
+port sèrie mostres d'un byte, i GNUPlot ho llegeix directament.
+Després, s'analitzaran les dues vies possibles per desenvolupar un
+osci\lgem oscopi amb sistema de ``trigger'' i s'intentarà ampliar les
+arquitectures proposades.  I finalment, es farà una comparació entre
+arquitectures per evaluar les avantatges i inconvenients de cada una.
+
+\section{Visualització en temps real amb GNUPlot}
+
+Per tal de transformar GNUPlot en una eina que pugui simular un
+osci\lgem oscopi, primer s'ha d'aconseguir una visualització en temps
+real de les dades. Com s'ha mencionat a l'introducció, GNUPlot és una
+eina per graficar que està dissenyada per llegir fitxers de dades
+estàtics.
+
+De fet, GNUPlot només pot generar un gràfic a partir d'un conjunt de
+dades si s'arriba a la condició de final de fitxer (EOF). Tot i que el
+port sèrie pot fer saltar la condició d'EOF (amb el caràcter EOT,
+0x04), fer-ho reinicia l'Arduino cada cop que GNUPlot obre el port
+sèrie. Per tant, es requereix algún programa auxiliar que mantingui
+obert el flux de dades amb el microcontrolador i pugui generar de
+manera fiable la condició d'EOF per a la lectura de dades.
+
+En aquesta secció es detallarà la implementació d'aquest programa
+auxiliar per establir una comunicació estable i permetre la
+visualització en temps real de les dades en el gràfic de GNUPlot.
+
+\subsection{Reescriptura contínua del fitxer}
+
+En un primer moment, es pot pensar que la solució per aconseguir que
+GNUPlot mostri dades en temps real seria reescriure contínuament un
+fitxer de dades (preferiblement ubicat al directori /tmp per aprofitar
+la velocitat de la memòria RAM). Però aquest enfocament presenta una
+gran problemàtica.
+
+Com que un programa auxiliar és el que estarà actualitzant el fitxer
+de dades, caldrà alguna manera de sincronitzar les escriptures del
+programa auxiliar i les lectures de GNUPlot. La principal dificultat
+de sincronitzar aquest mètode ve perquè GNUPlot no ofereix una manera
+directa per fer servir la comunicació entre processos. És difícil
+establir una comunicació bidireccional entre productor i consumidor
+(Programa auxiliar i GNUPlot) sense mètodes com les cues de missatges
+\cite{cues-missatges} o ``sockets UNIX'' \cite{sockets-unix}.
+
+Per altra banda, també preocupa la possible sobrecàrrega d'interactuar
+amb un fitxer en constant reescriptura. Tot i que el fitxer està a la
+memòria RAM, la interacció amb el fitxer requereix utilitzar crides de
+sistema específiques per qualsevol operació (obertura/tancament,
+escriptura, ``flush''...), podent afectar el rendiment de la solució
+fins al punt d'impossibilitar-la.
+
+\subsection{Canonades amb nom}
+
+Una bona alternativa respecte a la reescriptura contínua serien les
+canonades amb nom (\cite[``Named Pipes'']{canonades-nom}) o FIFOs
+(``First-In First-Out'').  Les canonades són un mecanisme de
+comunicació unidireccional entre processos que permet la transmissió
+de dades unidireccional.  En concret, les canonades amb nom són
+accessibles per qualsevol procés, ja que apareixen al sistema de
+fitxers com un fitxer especial.
+
+En contrast amb l'enfocament de reescriure contínuament un fitxer, les
+canonades eviten la necessitat de sincronitzar les escriptures i
+lectures entre el programa auxiliar i GNUPlot, ja que les dades es
+transmeten directament de manera unidireccional. I tancar una canonada
+per la banda del transmissor provoca un final de fitxer, generant la
+condició perfecte per senyalitzar a GNUPlot que ha llegit totes les
+mostres a representar.
+
+A més, les canonades proporcionen un mecanisme de comunicació
+eficient, ja que les dades es transmeten en memòria compartida, sense
+la necessitat d'operacions de fitxers específiques. Això minimitza la
+sobrecàrrega associada amb les crides de sistema per a l'obertura,
+tancament i altres operacions de fitxers.
+
+Però cal tenir en compte que l'ús de canonades pot generar
+sobrecàrrega en la interacció amb el sistema de fitxers. Com que es
+treballa amb la condició de final de fitxer, GNUPlot ha d'obrir i
+tancar la canonada cada cop que arriba un bloc de mostres.
+
+Això vol dir que, tot i que serà més eficient que la reescriptura d'un
+fitxer (ja que és un mètode que està pensat per comunicar ràpidament
+processos), les constants crides de sistema per a l'obertura i el
+tancament de la canonada podrien afectar el rendiment d'aquesta
+solució.
+
+\section{L'arquitectura més simple d'OsPlot}
+
+Després d'haver provat que es pot obtenir una visualització en temps
+real de les dades a GNUPlot, es pot procedir a implementar una
+arquitectura bàsica d'OsPlot.
+
+Aquesta arquitectura utilitzarà un Arduino que contínuament generarà
+mostres amb l'ADC per enviar-les a través del port sèrie. Com que
+interessa tenir una freqüència de mostreig elevada (al voltant de 76
+kHz), l'ADC produirà mostres amb una resolució útil de 8 bits a causa
+de les limitacions pròpies del perifèric.
+
+Es tindrà un programa auxiliar que obrirà una canonada amb nom i
+mantindrà el port sèrie obert, reenviant les mostres cap a la canonada
+i generant la condició d'EOF cada 500 mostres.
+
+Finalment, l'intèrpret de GNUPlot executarà un script que configurarà
+la visualització del gràfic i constantment llegirà les noves dades que
+arribin a través de la canonada. La creació i destrucció d'aquest
+procés estarà controlada pel programa auxiliar.
+
+\subsection{Programa d'Arduino amb C}
+
+Utilitzant el llenguatge C, s'ha desenvolupat un programa per a
+l'Arduino que habilita l'ADC i el port sèrie per a la captura i
+transmissió de mostres analògiques. S'ha triat aquest llenguatge
+principalment perquè les llibreries del port sèrie (modificades de
+l'assignatura de Programació de Baix nivell) estaven escrites en C.
+
+En primer lloc, es configuren els paràmetres de l'ADC, indicant el pin
+del qual llegir, A5, la tensió màxima de referència, 5 V, i el
+``prescaler'' del rellotge a x128, donant una freqüència de mostreig
+de 9615 Hz. Per aprofitar el temps, ja s'inicia la primera lectura de
+l'ADC.
+
+Seguidament, es configura el port sèrie per establir la velocitat de
+transmissió a 1 Mbps, i altres configuracions típiques com 8 bits per
+paquet, sense paritat i un bit de parada. Un cop inicialitzat
+s'activen les interrupcions, ja que la llibreria del port sèrie ho
+requereix.
+
+Finalment, l'Arduino entra en un bucle infinit on espera que la mostra
+estigui preparada. Quan ja s'obté la mostra, ràpidament s'inicia una
+nova lectura i s'envia la mostra actual a l'ordinador.
+
+\subsection{``Script'' de GNUPlot}
+
+GNUPlot és un intèrpret d'ordres que permet generar gràfiques a partir
+de dades. Per aconseguir la visualització en temps real de les dades
+capturades, cal definir un seguit d'ordres que GNUPlot interpretarà
+per fer la visualització de les dades.
+
+Primer de tot s'han de configurar els aspectes visuals de la gràfica,
+com ara els colors, els tipus de línies i els rangs dels eixos ``x'' i
+``y''. Això es pot fer amb les ordres ``set style'' i ``set
+xrange/yrange'' respectivament.
+
+Llavors per aconseguir la primera visualització a partir de la
+canonada, cal fer servir l'ordre ``plot''. Aquesta ordre és
+responsable de generar el gràfic basat en les dades rebudes des de la
+canonada. Per obtenir una representació adequada, és necessari
+especificar-hi diversos paràmetres:
+
+\begin{itemize}
+	\item ``binary format="\%uchar"'': Aquest paràmetre té com a
+          finalitat especificar el format de les dades que s'estan
+          llegint des de la canonada. En aquest cas, s'indica que cada
+          valor de l'eix ``x'' és un byte, i l'eix ``y'' el genera
+          GNUPlot.
+	\item ``using (column(0)/fs):(column(1)*5/255)'': Aquest
+          paràmetre és responsable de l'adaptació dels valors dels
+          eixos per aconseguir una representació adequada de les
+          dades. L'expressió ``(column(0)/fs)'' fa referència a les
+          dades de l'eix ``x'', que són dividides per la freqüència de
+          mostreig per obtenir l'escala de temps. D'altra banda,
+          l'expressió ``(column(1)*5/255)'' fa referència a les dades
+          de l'eix ``y''. Mitjançant aquesta fórmula, les mostres es
+          transformen a valors de tensió, ja que es multiplica per 5 V
+          (rang màxim de l'ADC) i es divideix per 255 (rang màxim d'un
+          byte).
+\end{itemize}
+
+Finalment, l'``script'' realitza el plot continu de les dades rebudes
+entrant en un bucle que executa l'ordre ``replot''. Aquesta ordre
+torna a executar l'ordre de ``plot'' anterior. Com els valors que
+arriben a través de la canonada van canviant, l'ús de l'ordre
+``replot'' és fonamental per aconseguir la visualització actualitzada
+en temps real. En cada iteració del bucle, GNUPlot espera la recepció
+de les noves dades i procedeix a regenerar el gràfic per reflectir els
+últims canvis.
+
+\newpage
+
+\subsection{Programa auxiliar amb C}
+
+L'últim pas és implementar la comunicació entre el port sèrie i
+GNUPlot, la qual s'implementarà amb C.  Aquesta elecció de llenguatge
+es basa en la seva capacitat per gestionar canonades i interaccions
+amb el port sèrie sense necessitat de llibreries addicionals.
+
+Per començar, és necessari configurar el port sèrie.  Amb l'objectiu
+de simplificar el procés, s'utilitza l'eina \cite[``stty'']{stty}, que
+permet configurar el fitxer del port sèrie com un pseudoterminal de
+Linux. D'aquesta manera, és possible llegir-lo com un fitxer normal
+mitjançant les funcions ``fopen'', ``fread'', i altres.
+
+Després es crea el procés de GNUPlot utilitzant la comanda ``gnuplot
+-e ``cua\_lectura='NOM\_FIFO'; fs=16000000/128/13'' plot.gnu'' on:
+\begin{itemize}
+	\item ``-e'': Accepta una llista d'ordres per l'intèrpret.
+	\item ``cua\_lectura'': Aquesta ordre indica el nom de la
+          canonada a GNUPlot.
+    \item ``fs'': Aquesta ordre configura la freqüència de mostreig de
+      les dades. Es calcula amb l'equació de la freqüència de l'ADC de
+      l'Arduino.
+	\item ``plot.gnu'': El nom de l'``script'' de GNUPlot.
+\end{itemize}
+
+Un cop està tot inicialitzat, el programa entra en un bucle continu on
+es llegeixen 500 bytes del port sèrie, s'obre la canonada i s'hi
+escriuen els 500 bytes, i es tanca la canonada per generar la condició
+de final de fitxer.
+
 \printbibliography
 
 \end{document}
