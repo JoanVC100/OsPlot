@@ -69,7 +69,7 @@ Tot el meu agraïment.
 \begin{resum}
 Aquest document descriu una solució anomenada OsPlot, una arquitectura
 genèrica que permet transformar un microcontrolador i un ordinador en
-un osci\lgem oscopi funcional.  Mitjançant l'ús de plataformes obertes
+un osci\lgem oscopi funcional. Mitjançant l'ús de plataformes obertes
 com Linux, Arduino i GNUPlot, aquesta investigació intenta oferir una
 solució de baix cost i accessible per a gent interessada en l'anàlisi
 de senyals.
@@ -185,7 +185,7 @@ dissenyar l'arquitectura més simple d'OsPlot, on una Arduino envia pel
 port sèrie mostres d'un byte, i GNUPlot ho llegeix directament.
 Després, s'analitzaran les dues vies possibles per desenvolupar un
 osci\lgem oscopi amb sistema de ``trigger'' i s'intentarà ampliar les
-arquitectures proposades.  I finalment, es farà una comparació entre
+arquitectures proposades. I finalment, es farà una comparació entre
 arquitectures per evaluar les avantatges i inconvenients de cada una.
 
 \section{Visualització en temps real amb GNUPlot}
@@ -236,9 +236,9 @@ fins al punt d'impossibilitar-la.
 
 Una bona alternativa respecte a la reescriptura contínua serien les
 canonades amb nom (\cite[``Named Pipes'']{canonades-nom}) o FIFOs
-(``First-In First-Out'').  Les canonades són un mecanisme de
+(``First-In First-Out''). Les canonades són un mecanisme de
 comunicació unidireccional entre processos que permet la transmissió
-de dades unidireccional.  En concret, les canonades amb nom són
+de dades unidireccional. En concret, les canonades amb nom són
 accessibles per qualsevol procés, ja que apareixen al sistema de
 fitxers com un fitxer especial.
 
@@ -349,7 +349,7 @@ especificar-hi diversos paràmetres:
           byte).
 \end{itemize}
 
-Finalment, l'``script'' realitza el plot continu de les dades rebudes
+Finalment, el ``script'' realitza el plot continu de les dades rebudes
 entrant en un bucle que executa l'ordre ``replot''. Aquesta ordre
 torna a executar l'ordre de ``plot'' anterior. Com els valors que
 arriben a través de la canonada van canviant, l'ús de l'ordre
@@ -363,11 +363,11 @@ de les noves dades i procedeix a regenerar el gràfic per reflectir els
 \subsection{Programa auxiliar amb C}
 
 L'últim pas és implementar la comunicació entre el port sèrie i
-GNUPlot, la qual s'implementarà amb C.  Aquesta elecció de llenguatge
+GNUPlot, la qual s'implementarà amb C. Aquesta elecció de llenguatge
 es basa en la seva capacitat per gestionar canonades i interaccions
 amb el port sèrie sense necessitat de llibreries addicionals.
 
-Per començar, és necessari configurar el port sèrie.  Amb l'objectiu
+Per començar, és necessari configurar el port sèrie. Amb l'objectiu
 de simplificar el procés, s'utilitza l'eina \cite[``stty'']{stty}, que
 permet configurar el fitxer del port sèrie com un pseudoterminal de
 Linux. D'aquesta manera, és possible llegir-lo com un fitxer normal
@@ -376,19 +376,191 @@ mitjançant les funcions ``fopen'', ``fread'', i altres.
 Després es crea el procés de GNUPlot utilitzant la comanda ``gnuplot
 -e ``cua\_lectura='NOM\_FIFO'; fs=16000000/128/13'' plot.gnu'' on:
 \begin{itemize}
-	\item ``-e'': Accepta una llista d'ordres per l'intèrpret.
-	\item ``cua\_lectura'': Aquesta ordre indica el nom de la
-          canonada a GNUPlot.
-    \item ``fs'': Aquesta ordre configura la freqüència de mostreig de
-      les dades. Es calcula amb l'equació de la freqüència de l'ADC de
-      l'Arduino.
-	\item ``plot.gnu'': El nom de l'``script'' de GNUPlot.
+      \item ``-e'': Accepta una llista d'ordres per l'intèrpret.
+      \item ``cua\_lectura'': Aquesta ordre indica el nom de la
+            canonada a GNUPlot.
+      \item ``fs'': Aquesta ordre configura la freqüència de mostreig de
+            les dades. Es calcula amb l'equació de la freqüència de l'ADC de
+            l'Arduino.
+      \item ``plot.gnu'': El nom del ``script'' de GNUPlot.
 \end{itemize}
 
 Un cop està tot inicialitzat, el programa entra en un bucle continu on
 es llegeixen 500 bytes del port sèrie, s'obre la canonada i s'hi
 escriuen els 500 bytes, i es tanca la canonada per generar la condició
 de final de fitxer.
+
+\subsection{Sistema de ``trigger''}
+
+En aquesta versió simplificada d'OsPlot, s'ha prescindit de la
+incorporació d'un sistema de ``trigger'', una funció imprescindible
+per un osci\lgem oscopi. L'objectiu d'aquesta decisió era demostrar
+que GNUPlot és una eina và\lgem ida per la visualització de dades en
+temps real, alhora que s'estableixen unes bases de l'arquitectura
+OsPlot. A partir d'aquí, existeixen dues variacions de l'arquitectura
+que permeten incorporar un sistema de ``trigger''.
+
+La primera opció és OsPlot-PC, en què el programa del microcontrolador
+no requereix modificacions, mentre que el programa auxiliar,
+mitjançant un algoritme determina quan es compleix la condició de
+``trigger'' i envia un nombre de mostres a GNUPlot.
+
+La segona opció és OsPlot-MCU, que implica modificar el programa del
+microcontrolador per enviar un nombre determinat de mostres un cop es
+produeixi la condició de ``trigger''. En aquest cas, l'algoritme
+s'executaria directament en el microcontrolador, permetent un programa
+auxiliar sense pràcticament modificacions.
+
+\newpage
+
+\section{OsPlot-PC}
+
+\subsection{Descripció de l'arquitectura}
+
+L'enfocament de l'arquitectura OsPlot-PC implica realitzar
+modificacions en el programa auxiliar, mentre que el programa del
+microcontrolador es manté intacte. El programa auxiliar es modifica
+per incorporar un algoritme de ``trigger'' que contínuament analitza
+les mostres rebudes i decideix el moment òptim per iniciar l'enviament
+de dades a GNUPlot.
+
+Un dels avantatges clau de l'opció OsPlot-PC (a part d'incorporar
+``trigger'') és que permet realitzar un processament digital del
+senyal complex amb totes les mostres que enviï el microcontrolador. Es
+poden aplicar filtres digitals per eliminar soroll, fer operacions
+matemàtiques complexes, o aplicar altres processaments específics per
+extreure informació rellevant del senyal capturat.
+
+A més, un altre avantatge significatiu és la possibilitat d'obtenir
+velocitats de mostreig més elevades. En mantenir un programa petit al
+microcontrolador, es manté la seva capacitat per generar mostres a
+alta velocitat, mentre que el programa auxiliar s'encarrega de
+gestionar el sistema del ``trigger''.
+
+\subsection{Extensions}
+\label{subsec:extensions-osplot-pc}
+
+\subsubsection{Comunicació entre microcontrolador i ordinador}
+
+Fins ara, s'ha posat èmfasi en la comunicació entre el
+microcontrolador i l'ordinador utilitzant el port sèrie, ja que és el
+perifèric més comú a la majoria d'ordinadors (el port USB). No obstant
+això, no hi ha cap restricció que impedeixi l'ús d'altres busos
+serial, com SPI o I2C, per transmetre les mostres des del
+microcontrolador. Això es pot realitzar mitjançant adaptadors a USB, o
+altres sistemes com ara una placa Raspberry Pi, que incorporen suport
+per aquests busos de manera nativa.
+
+A més, es pot ampliar encara més l'abast de comunicació utilitzant
+altres microcontroladors com l'ESP32, que permeten la transmissió de
+mostres utilitzant altres mètodes com ara Sockets TCP/IP o
+WebSockets. Aquestes tecnologies permeten establir connexions de xarxa
+entre el microcontrolador i l'ordinador, obrint noves possibilitats
+com transmetre mostres a través de xarxes sense fils.
+
+Si es decideix utilitzar la comunicació mitjançant ``sockets'',
+principalment es pot enfocar de dues maneres:
+
+\begin{itemize}
+	\item Fent servir \cite[socat]{socat}, una eina que permet,
+          entre altres funcionalitats, transformar un ``socket'' en un
+          PTY. Això vol dir que un programa de ``trigger''
+          desenvolupat per al port sèrie hauria de ser compatible amb
+          qualsevol microcontrolador que faci servir ``sockets''.
+	\item Treballar directament amb ``sockets''. Aquest mètode
+          ofereix un millor rendiment, ja que no requereix cap mena de
+          conversió addicional, però requereix reprogramar part del
+          programa auxiliar.
+\end{itemize}
+
+\newpage
+
+\subsubsection{Millores a GNUPlot i alternatives}
+
+També és important destacar que l'enfocament actual s'ha centrat en la
+comoditat i la simplicitat, utilitzant GNUPlot com un procés
+independent del ``trigger''. Això ha facilitat el desenvolupament del
+programa auxiliar i la seva integració amb el microcontrolador, però
+si es vol obtenir una solució més elaborada i eficient s'hauria de
+considerar l'ús de llibreries específiques per a GNUPlot, juntament
+amb un ``framework'' d'interfície d'usuari que permeti crear una
+interfície interactiva semblant a la d'un osci\lgem oscopi
+tradicional.
+
+L'ús de llibreries dedicades per a GNUPlot ofereix avantatges com un
+major control i personalització dels gràfics, alhora que s'elimina la
+necessitat de gestionar un segon procés. També permetria interactuar
+directament amb GNUPlot, eliminant la necessitat d'una cua i les
+crides al sistema implicades, millorant l'eficiència i el rendiment
+del programa.
+
+A més de les millores a GNUPlot, és rellevant assenyalar que hi ha
+altres alternatives disponibles que poden ser més adequades en estar
+preparades per integrar-se en un programa, a diferència de
+GNUPlot. Una d'aquestes alternatives és
+\href{https://docs.rs/plotters/latest/plotters}{\underline{plotters}},
+una llibreria de ``Rust'' que permet crear gràfiques com les de
+GNUPlot. Una altra alternativa és utilitzar
+\href{https://www.chartjs.org/}{\underline{Chart.js}}, una llibreria
+de ``JavaScript'' que, juntament amb ``frameworks'' com
+\href{https://kit.svelte.dev/}{\underline{SvelteKit}}, permetria
+desenvolupar una interfície gràfica universal. Les dues llibreries
+mencionades suporten visualització en temps real de manera nativa.
+
+\subsection{Diagrama de l'arquitectura}
+
+\newpage
+
+\section{OsPlot-MCU}
+
+\subsection{Descripció de l'arquitectura}
+
+OsPlot-MCU adopta un enfocament diferent per a la comunicació entre el
+microcontrolador i l'ordinador. En aquest cas el programa del
+microcontrolador es modifica per implementar el sistema de ``trigger''
+directament en el mateix microcontrolador.
+
+L'avantatge principal d'aquesta solució és la seva eficiència,
+especialment quan el microcontrolador té una capacitat substancial de
+processament disponible. D'aquesta manera s'aprofita la totalitat dels
+recursos interns del microcontrolador per realitzar el processament
+necessari, reduint la càrrega de computació a l'ordinador i alliberant
+recursos per altres tasques.
+
+Precisament per això, l'enfocament d'OsPlot-MCU és adequat en
+situacions en què es desitja minimitzar la càrrega de computació a
+l'ordinador per diversos motius. Per exemple, en aplicacions on s'ha
+de considerar l'eficiència energètica o si es vol reduir la
+dependència de l'ordinador per a tasques de processament intensives.
+
+\subsection{Extensions}
+
+Com amb OsPlot-PC, OsPlot-MCU ofereix altres opcions per la
+comunicació entre el microcontrolador i l'ordinador. A part del port
+sèrie, és possible utilitzar altres protocols de comunicació sèrie com
+SPI o I2C, o fins i tot comunicació a través de ``sockets''. I també
+existeix la possibilitat de fer servir llibreries específiques de
+GNUPlot o altres eines per fer gràfiques com les que s'han mencionat a
+l'apartat \ref{subsec:extensions-osplot-pc}.
+
+\subsubsection{Comunicació bidireccional amb el microcontrolador}
+
+En l'arquitectura OsPlot-MCU l'algoritme de ``trigger'' s'executa al
+microcontrolador, pràcticament forçant a establir una comunicació
+bidireccional per permetre l'ajust dels paràmetres del ``trigger''.
+Això vol dir que pel port sèrie circularan bytes que no representen
+mostres, obligant a establir algun mecanisme per distingir-los.
+
+Una manera senzilla i eficient d'aconseguir-ho és utilitzant un
+caràcter d'escapament i enviament per paquets. Per exemple, si prenem
+el byte 128 com a caràcter d'escapament, una mostra amb valor 128 es
+representaria com 128 i 128, mentre que un final del paquet de mostres
+es pot indicar amb els bytes 128 i 0. Altres maneres més elaborades
+impliquen l'ús d'eines com \href{Protobuf}{https://protobuf.dev/}, un
+mecanisme eficient de serialització que permet estructurar dades per
+crear un protocol de comunicació.
+
+\subsection{Diagrama de l'arquitectura}
 
 \printbibliography
 
