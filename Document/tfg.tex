@@ -2,7 +2,8 @@
 % per a fórmules químiques
 \usepackage[version=4]{mhchem}
 % Per dibuixar gràfics: base general i gràfics senzills
-\usepackage{tikz} \usetikzlibrary{arrows}
+\usepackage{tikz}
+\usetikzlibrary{arrows, positioning, fit}
 % Per dibuixar gràfics: circuits electrònics
 \usepackage[europeanresistors,americaninductors]{circuitikz}
 % Per dibuixar gràfics: diagrames diversos
@@ -509,7 +510,33 @@ mencionades suporten visualització en temps real de manera nativa.
 
 \subsection{Diagrama de l'arquitectura}
 
-\newpage
+\begin{figure}[!hb]
+      \centering
+      \resizebox{\textwidth}{!}{
+      \begin{tikzpicture}
+            \node[draw, rectangle] (mcu) {MCU};
+            \node[right=of mcu, xshift=8em, minimum height=1.15em] (nexe-serie-socat) {};
+            \node[draw, rectangle, align=center, right=of nexe-serie-socat] (trigger) {Trigger};
+            \node[draw, rectangle, right=7em of trigger] (gnuplot) {GNUPlot};
+            \draw[-] (mcu) -- node[yshift=-0.1em, align=center] {Comunicació sèrie\\(UART, I2C, SPI...)} (nexe-serie-socat.center);
+            \draw[->] (nexe-serie-socat.center) -- (trigger);
+            \draw[->] (trigger) -- node[yshift=-0.1em, align=center] {IPC\\(Canonades)} (gnuplot);
+
+            \node[draw, rectangle, below=of nexe-serie-socat] (socat) {Socat};
+            \node[below=of socat] (nexe-sockets) {};
+            \draw[-, to path={|- node[yshift=-0.1em, xshift=6em, align=center] {Sockets\\(TCP, WebSocket...)} (\tikztotarget)}] (mcu) edge (nexe-sockets.center);
+            \draw[->] (nexe-sockets.center) -- (socat); \draw (socat) -- (nexe-serie-socat.center);
+
+            \node[draw, rectangle, align=center, above=of gnuplot] (llibreria-gnuplot) {Llibreria GNUPlot\\(o altres eines)};
+            \draw[-, to path={|- node[above, xshift=3.3em] {IPC / Sockets} (\tikztotarget)}] (trigger.north) edge[<->] (llibreria-gnuplot);
+
+            \node[draw, rectangle, align=center, right=of socat] (solucio-integral) {Solució integral};
+            \node[below=of nexe-serie-socat, yshift=2.1em] (nexe-serie-solucio) {};
+            \draw[->] (socat) -- (solucio-integral);
+            \draw[-, to path={-| (\tikztotarget)}] (nexe-sockets.center) edge[->] (solucio-integral);
+      \end{tikzpicture}
+      }
+\end{figure}
 
 \section{OsPlot-MCU}
 
@@ -519,7 +546,7 @@ OsPlot-MCU adopta un enfocament diferent per a la comunicació entre el
 microcontrolador i l'ordinador. En aquest cas el programa del
 microcontrolador es modifica per implementar el sistema de ``trigger''
 directament en el mateix microcontrolador.
-
+\newpage
 L'avantatge principal d'aquesta solució és la seva eficiència,
 especialment quan el microcontrolador té una capacitat substancial de
 processament disponible. D'aquesta manera s'aprofita la totalitat dels
@@ -556,11 +583,40 @@ caràcter d'escapament i enviament per paquets. Per exemple, si prenem
 el byte 128 com a caràcter d'escapament, una mostra amb valor 128 es
 representaria com 128 i 128, mentre que un final del paquet de mostres
 es pot indicar amb els bytes 128 i 0. Altres maneres més elaborades
-impliquen l'ús d'eines com \href{Protobuf}{https://protobuf.dev/}, un
-mecanisme eficient de serialització que permet estructurar dades per
-crear un protocol de comunicació.
+impliquen l'ús d'eines com
+\href{Protobuf}{\underline{https://protobuf.dev/}}, un mecanisme
+eficient de serialització que permet estructurar dades per crear un
+protocol de comunicació.
 
 \subsection{Diagrama de l'arquitectura}
+
+\begin{figure}[!hb]
+      \centering
+      \resizebox{\textwidth}{!}{
+      \begin{tikzpicture}
+            \node[draw, rectangle] (mcu) {MCU};
+            \node[right=of mcu, xshift=8em, minimum height=1.15em] (nexe-serie-socat) {};
+            \node[draw, rectangle, align=center, right=of nexe-serie-socat] (trigger) {Pre-processador\\byte de control};
+            \node[draw, rectangle, right=7em of trigger] (gnuplot) {GNUPlot};
+            \draw[-] (mcu) -- node[yshift=-0.1em, align=center] {Comunicació sèrie\\(UART, I2C, SPI...)} (nexe-serie-socat.center);
+            \draw[->] (nexe-serie-socat.center) -- (trigger);
+            \draw[->] (trigger) -- node[yshift=-0.1em, align=center] {IPC\\(Canonades)} (gnuplot);
+
+            \node[draw, rectangle, below=of nexe-serie-socat] (socat) {Socat};
+            \node[below=of socat] (nexe-sockets) {};
+            \draw[-, to path={|- node[yshift=-0.1em, xshift=6em, align=center] {Sockets\\(TCP, WebSocket...)} (\tikztotarget)}] (mcu) edge (nexe-sockets.center);
+            \draw[->] (nexe-sockets.center) -- (socat); \draw (socat) -- (nexe-serie-socat.center);
+
+            \node[draw, rectangle, align=center, above=of gnuplot] (llibreria-gnuplot) {Llibreria GNUPlot\\(o altres eines)};
+            \draw[-, to path={|- node[above, xshift=3.3em] {IPC / Sockets} (\tikztotarget)}] (trigger.north) edge[<->] (llibreria-gnuplot);
+
+            \node[draw, rectangle, align=center, right=of socat] (solucio-integral) {Solució integral};
+            \node[below=of nexe-serie-socat, yshift=2.1em] (nexe-serie-solucio) {};
+            \draw[->] (socat) -- (solucio-integral);
+            \draw[-, to path={-| (\tikztotarget)}] (nexe-sockets.center) edge[->] (solucio-integral);
+      \end{tikzpicture}
+      }
+\end{figure}
 
 \printbibliography
 
