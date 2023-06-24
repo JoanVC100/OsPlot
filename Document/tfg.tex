@@ -3,7 +3,8 @@
 \usepackage[version=4]{mhchem}
 % Per dibuixar gràfics: base general i gràfics senzills
 \usepackage{tikz}
-\usetikzlibrary{arrows, positioning, fit}
+\usetikzlibrary{arrows, positioning, automata}
+\tikzset{initial text=Inici, every state/.style={thick, fill=gray!10}}
 % Per dibuixar gràfics: circuits electrònics
 \usepackage[europeanresistors,americaninductors]{circuitikz}
 % Per dibuixar gràfics: diagrames diversos
@@ -290,6 +291,7 @@ arribin a través de la canonada. La creació i destrucció d'aquest
 procés estarà controlada pel programa auxiliar.
 
 \subsection{Programa d'Arduino amb C}
+\label{programa-arduino-c}
 
 Utilitzant el llenguatge C, s'ha desenvolupat un programa per a
 l'Arduino que habilita l'ADC i el port sèrie per a la captura i
@@ -584,7 +586,7 @@ el byte 128 com a caràcter d'escapament, una mostra amb valor 128 es
 representaria com 128 i 128, mentre que un final del paquet de mostres
 es pot indicar amb els bytes 128 i 0. Altres maneres més elaborades
 impliquen l'ús d'eines com
-\href{Protobuf}{\underline{https://protobuf.dev/}}, un mecanisme
+\href{https://protobuf.dev/}{\underline{Protobuf}}, un mecanisme
 eficient de serialització que permet estructurar dades per crear un
 protocol de comunicació.
 
@@ -617,6 +619,118 @@ protocol de comunicació.
       \end{tikzpicture}
       }
 \end{figure}
+
+\chapter{Implementació d'OsPlot-PC amb Arduino-C/Python/Chart.js}
+
+En aquesta secció es descriu un exemple d'implementació
+d'OsPlot-PC. El programa de l'Arduino és el mateix que s'ha
+descrit a l'apartat \ref{programa-arduino-c}. L'algoritme de ``trigger''
+s'implementarà utilitzant Python asíncron, i es comunicarà amb una
+interfície basada en tecnologia web mitjançant l'ús de WebSockets.
+
+El codi font d'aquesta implementació es pot trobar a
+\url{https://github.com/JoanVC100/OsPlot/tree/main/OsPlot-PC}.
+
+\section{``Trigger'' Python amb WebSockets}
+
+\subsection{Descripció de l'algoritme de ``trigger''}
+
+Per simplicitat, s'ha modelat mitjançant una màquina d'estats
+un algoritme de ``trigger normal'' activat per flanc de pujada (sense disparador automàtic).
+
+La màquina comença en l'estat
+``ESPERANT\_TRIGGER'', on compara successivament les mostres
+d'entrada amb un nivell de trigger predefinit. Quan es detecta
+un flanc de pujada (la mostra actual és inferior al nivell de
+trigger i la mostra anterior és igual o superior al nivell de
+trigger), la màquina passa a l'estat ``CAPTURANT''.
+
+En l'estat de ``CAPTURANT'' es fa servir un comptador
+que disminueix a mesura que arriben les mostres. Un cop es captura 
+un nombre de mostres determinat (n\_capturades $== 0$), s'envien
+les mostres a la interfície i la màquina torna a l'estat
+d'``ESPERANT\_TRIGGER''.
+
+\begin{figure}[!hb]
+      \centering
+      \resizebox{\textwidth}{!}{
+      \begin{tikzpicture}[node distance=7.5cm]
+            \node[state, initial, align=center] (esperant_trigger) {ESPERANT\\TRIGGER};
+            \node[state, right of=esperant_trigger] (capturant) {CAPTURANT};
+            \draw (esperant_trigger) edge[->] node[align=center]{$x_{n-1}\leq$nivell\_trigger \&\&\\$x_{n}\geq$ nivell\_trigger} (capturant)
+            (capturant) edge[loop above] node[align=center]{n\_capturades$--\neq 0$} (capturant)
+            (capturant) edge[bend right, above, ->] node[align=center]{n\_capturades$== 0$} (esperant_trigger);
+      \end{tikzpicture}
+      }
+      \caption{Diagrama de la màquina d'estats del ``trigger''}
+\end{figure}
+
+\subsection{Transmissió de les mostres amb WebSockets}
+
+Els \cite[WebSockets]{websockets} són una tecnologia que permet
+una comunicació persistent, bidireccional i en temps real entre
+client i servidor. Aquesta tecnologia és ideal per rebre
+les mostres del ``trigger'' i alhora comunicar-se amb el servidor
+per canviar certs paràmetres de l'algoritme. En aquest projecte,
+s'ha utilitzat la llibreria de Python
+\href{https://pypi.org/project/websockets/}{\underline{websockets}}, que està
+dissenyada per treballar amb Python asíncron
+(\href{https://docs.python.org/3/library/asyncio.html}{\underline{asyncio}}).
+
+Primerament, el programa de ``trigger'' ha de cridar a la funció
+``websockets.serve()'', que crea un servidor WebSocket per acceptar
+peticions de connexions (escoltar al port 26142), i hi associa una funció que s'executarà
+per cada connexió entrant.
+
+Aquesta funció afegeix cada connexió en un conjunt global de Python
+(un ``set'' global)
+i entra en un bucle infinit. Dins del bucle principal, s'encarrega
+de rebre i gestionar els missatges enviats pels usuaris,
+com ara les so\lgem icituds de canvi de paràmetres específics.
+
+D'altra banda, la màquina d'estats del ``trigger'' fa
+servir el conjunt de connexions global per realitzar un
+``broadcast'' de les mostres quan la màquina surt de l'estat
+``CAPTURANT'', enviant de manera efectiva les
+mostres a tots els clients connectats a través de WebSockets.
+
+I per simplificar la comunicació entre la interfície i el
+``trigger'' s'ha utilitzat ``Protobuf'', que permet canviar
+els paràmetres de l'algoritme de ``trigger'' i rebre dades
+del servidor, com les mostres capturades. ``Protobuf''
+fa servir un format de missatges estructurat i eficient
+($\approx 2$bytes de sobrecàrrega per paquet de mostres),
+mantenint una transmissió de dades lleugera pels clients.
+
+\section{Interfície amb Chart.js}
+
+La interfície per visualitzar les mostres de l'osci\lgem oscopi
+s'ha desenvolupat utilitzant tecnologia web, fet que permet
+aprofitar els avantatges dels ``frameworks'' com ``Tauri'' per
+crear aplicacions multiplataforma.
+
+Per la construcció
+dels gràfics en temps real s'ha utilitzat una llibreria
+JavaScript anomenada Chart.js. Aquesta llibreria aprofita
+l'element ``canvas'' de HTML5 que permet oferir una
+experiència visual atractiva i interactiva, alhora que manté
+un bon rendiment respecte a altres alternatives.
+
+A diferència de GNUPlot, es transfereixen directament les
+mostres a un ``array'' associat al gràfic (en comptes de
+fer servir cues). Aquest ``array'' conté les dades dels eixos
+``x'' i ``y''. Quan arriba un paquet de mostres a través
+del WebSocket, es copien totes les mostres a les ``ys'' i
+es crida la funció ``update()'' per actualitzar el gràfic en
+temps real amb les noves dades.
+
+\chapter{Implementació d'OsPlot-MCU amb Arduino-C/Rust/GNUPlot}
+
+\section{Modificació del programa d'Arduino}
+
+\section{Programa auxiliar amb Rust}
+
+\section{Script de GNUPlot}
 
 \printbibliography
 
