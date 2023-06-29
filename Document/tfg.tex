@@ -623,8 +623,8 @@ protocol de comunicació.
 \chapter{Implementació d'OsPlot-PC amb Arduino-C/Python/Chart.js}
 
 En aquesta secció es descriu un exemple d'implementació
-d'OsPlot-PC. El programa de l'Arduino és el mateix que s'ha
-descrit a l'apartat \ref{programa-arduino-c}. L'algoritme de ``trigger''
+d'OsPlot-PC. El programa de l'Arduino és el mateix que s'ha descrit a
+l'apartat \ref{programa-arduino-c}. L'algoritme de ``trigger''
 s'implementarà utilitzant Python asíncron, i es comunicarà amb una
 interfície basada en tecnologia web mitjançant l'ús de WebSockets.
 
@@ -634,22 +634,22 @@ El codi font d'aquesta implementació es pot trobar a
 \section{``Trigger'' Python amb WebSockets}
 
 \subsection{Descripció de l'algoritme de ``trigger''}
+\label{subsec:maquina-trigger}
 
-Per simplicitat, s'ha modelat mitjançant una màquina d'estats
-un algoritme de ``trigger normal'' activat per flanc de pujada (sense disparador automàtic).
+Per simplicitat, s'ha modelat mitjançant una màquina d'estats un
+algoritme de ``trigger normal'' activat per flanc de pujada (sense
+disparador automàtic).
 
-La màquina comença en l'estat
-``ESPERANT\_TRIGGER'', on compara successivament les mostres
-d'entrada amb un nivell de trigger predefinit. Quan es detecta
-un flanc de pujada (la mostra actual és inferior al nivell de
-trigger i la mostra anterior és igual o superior al nivell de
-trigger), la màquina passa a l'estat ``CAPTURANT''.
+La màquina comença en l'estat ``ESPERANT\_TRIGGER'', on compara
+successivament les mostres d'entrada amb un nivell de trigger
+predefinit. Quan es detecta un flanc de pujada (la mostra actual és
+inferior al nivell de trigger i la mostra anterior és igual o superior
+al nivell de trigger), la màquina passa a l'estat ``CAPTURANT''.
 
-En l'estat de ``CAPTURANT'' es fa servir un comptador
-que disminueix a mesura que arriben les mostres. Un cop es captura 
-un nombre de mostres determinat (n\_capturades $== 0$), s'envien
-les mostres a la interfície i la màquina torna a l'estat
-d'``ESPERANT\_TRIGGER''.
+En l'estat de ``CAPTURANT'' es fa servir un comptador que disminueix a
+mesura que arriben les mostres. Un cop es captura un nombre de mostres
+determinat (n\_capturades $== 0$), s'envien les mostres a la
+interfície i la màquina torna a l'estat d'``ESPERANT\_TRIGGER''.
 
 \begin{figure}[!hb]
       \centering
@@ -667,70 +667,193 @@ d'``ESPERANT\_TRIGGER''.
 
 \subsection{Transmissió de les mostres amb WebSockets}
 
-Els \cite[WebSockets]{websockets} són una tecnologia que permet
-una comunicació persistent, bidireccional i en temps real entre
-client i servidor. Aquesta tecnologia és ideal per rebre
-les mostres del ``trigger'' i alhora comunicar-se amb el servidor
-per canviar certs paràmetres de l'algoritme. En aquest projecte,
-s'ha utilitzat la llibreria de Python
-\href{https://pypi.org/project/websockets/}{\underline{websockets}}, que està
-dissenyada per treballar amb Python asíncron
+Els \cite[WebSockets]{websockets} són una tecnologia que permet una
+comunicació persistent, bidireccional i en temps real entre client i
+servidor. Aquesta tecnologia és ideal per rebre les mostres del
+``trigger'' i alhora comunicar-se amb el servidor per canviar certs
+paràmetres de l'algoritme. En aquest projecte, s'ha utilitzat la
+llibreria de Python
+\href{https://pypi.org/project/websockets/}{\underline{websockets}},
+que està dissenyada per treballar amb Python asíncron
 (\href{https://docs.python.org/3/library/asyncio.html}{\underline{asyncio}}).
 
 Primerament, el programa de ``trigger'' ha de cridar a la funció
 ``websockets.serve()'', que crea un servidor WebSocket per acceptar
-peticions de connexions (escoltar al port 26142), i hi associa una funció que s'executarà
-per cada connexió entrant.
+peticions de connexions (escoltar al port 26142), i hi associa una
+funció que s'executarà per cada connexió entrant.
 
 Aquesta funció afegeix cada connexió en un conjunt global de Python
-(un ``set'' global)
-i entra en un bucle infinit. Dins del bucle principal, s'encarrega
-de rebre i gestionar els missatges enviats pels usuaris,
-com ara les so\lgem icituds de canvi de paràmetres específics.
+(un ``set'' global) i entra en un bucle infinit. Dins del bucle
+principal, s'encarrega de rebre i gestionar els missatges enviats pels
+usuaris, com ara les so\lgem icituds de canvi de paràmetres
+específics.
 
-D'altra banda, la màquina d'estats del ``trigger'' fa
-servir el conjunt de connexions global per realitzar un
-``broadcast'' de les mostres quan la màquina surt de l'estat
-``CAPTURANT'', enviant de manera efectiva les
-mostres a tots els clients connectats a través de WebSockets.
+D'altra banda, la màquina d'estats del ``trigger'' fa servir el
+conjunt de connexions global per realitzar un ``broadcast'' de les
+mostres quan la màquina surt de l'estat ``CAPTURANT'', enviant de
+manera efectiva les mostres a tots els clients connectats a través de
+WebSockets.
 
-I per simplificar la comunicació entre la interfície i el
-``trigger'' s'ha utilitzat ``Protobuf'', que permet canviar
-els paràmetres de l'algoritme de ``trigger'' i rebre dades
-del servidor, com les mostres capturades. ``Protobuf''
-fa servir un format de missatges estructurat i eficient
-($\approx 2$bytes de sobrecàrrega per paquet de mostres),
+I per simplificar la comunicació entre la interfície i el ``trigger''
+s'ha utilitzat ``Protobuf'', que permet canviar els paràmetres de
+l'algoritme de ``trigger'' i rebre dades del servidor, com les mostres
+capturades. ``Protobuf'' fa servir un format de missatges estructurat
+i eficient ($\approx 2$bytes de sobrecàrrega per paquet de mostres),
 mantenint una transmissió de dades lleugera pels clients.
 
 \section{Interfície amb Chart.js}
 
-La interfície per visualitzar les mostres de l'osci\lgem oscopi
-s'ha desenvolupat utilitzant tecnologia web, fet que permet
-aprofitar els avantatges dels ``frameworks'' com ``Tauri'' per
-crear aplicacions multiplataforma.
+La interfície per visualitzar les mostres de l'osci\lgem oscopi s'ha
+desenvolupat utilitzant tecnologia web, fet que permet aprofitar els
+avantatges dels ``frameworks'' com ``Tauri'' per crear aplicacions
+multiplataforma.
 
-Per la construcció
-dels gràfics en temps real s'ha utilitzat una llibreria
-JavaScript anomenada Chart.js. Aquesta llibreria aprofita
-l'element ``canvas'' de HTML5 que permet oferir una
-experiència visual atractiva i interactiva, alhora que manté
-un bon rendiment respecte a altres alternatives.
+Per la construcció dels gràfics en temps real s'ha utilitzat una
+llibreria JavaScript anomenada Chart.js. Aquesta llibreria aprofita
+l'element ``canvas'' de HTML5 que permet oferir una experiència visual
+atractiva i interactiva, alhora que manté un bon rendiment respecte a
+altres alternatives.
 
-A diferència de GNUPlot, es transfereixen directament les
-mostres a un ``array'' associat al gràfic (en comptes de
-fer servir cues). Aquest ``array'' conté les dades dels eixos
-``x'' i ``y''. Quan arriba un paquet de mostres a través
-del WebSocket, es copien totes les mostres a les ``ys'' i
-es crida la funció ``update()'' per actualitzar el gràfic en
-temps real amb les noves dades.
+A diferència de GNUPlot, es transfereixen directament les mostres a un
+``array'' associat al gràfic (en comptes de fer servir cues). Aquest
+``array'' conté les dades dels eixos ``x'' i ``y''. Quan arriba un
+paquet de mostres a través del WebSocket, es copien totes les mostres
+a les ``ys'' i es crida la funció ``update()'' per actualitzar el
+gràfic en temps real amb les noves dades.
 
 \chapter{Implementació d'OsPlot-MCU amb Arduino-C/Rust/GNUPlot}
 
 \section{Modificació del programa d'Arduino}
 
+Com a punt de partida, es prendrà el programa desenvolupat a l'apartat
+\ref{programa-arduino-c} i s'hi incorporarà la màquina d'estats de
+l'apartat \ref{subsec:maquina-trigger}.  A més, s'afegirà la
+comunicació bidireccional per permetre canviar els paràmetres del
+``trigger'' des de la interfície, mitjançant una altra màquina
+d'estats.  I per acabar, s'inclourà un filtre per reduir la freqüència
+de mostreig efectiva calculant una mitjana de ``n'' mostres per tal de
+reduir el soroll que captura l'ADC.
+
+S'incorporarà la màquina d'estats al programa d'Arduino mitjançant un
+bucle després d'inicialitzar els perifèrics.  Aquesta màquina d'estats
+dictarà quan s'envia a través del port sèrie les mostres capturades.
+
+El codi font d'aquesta implementació es pot trobar a
+\url{https://github.com/JoanVC100/OsPlot/tree/main/OsPlot-MCU}.
+
+\subsection{Comunicació bidireccional amb el ``trigger''}
+
+Per a la comunicació bidireccional, s'ha adoptat una estratègia basada
+en l'enviament de paquets amb bytes de control per minimitzar el temps
+processament de mostres. S'ha implementat una màquina d'estats que, en
+l'estat ``MÀQUINA\_TRIGGER'', continua llegint mostres mentre no es
+generi una interrupció de recepció de bytes.
+
+Però, quan es produeix la primera interrupció, es para la captura de
+mostres i l'Arduino queda en l'estat ``REBRE\_ORDRES'', en espera
+d'ordres de l'ordinador. Només es reactiva l'algoritme de ``trigger''
+quan s'envia l'ordre ``INICIA\_TRIGGER'' des de l'ordinador.
+
+\begin{figure}[!hb]
+      \centering
+      \resizebox{\textwidth}{!}{
+      \begin{tikzpicture}[node distance=11cm]
+            \node[state, initial] (maquina_trigger) {MÀQUINA\_TRIGGER};
+            \node[state, right of=maquina_trigger] (rebre_ordres) {REBRE\_ORDRES};
+            \draw (maquina_trigger) edge[->, above] node{Interrupció RX} (rebre_ordres)
+            (rebre_ordres) edge[loop above] node{Qualsevol altra ordre} (rebre_ordres)
+            (rebre_ordres) edge[bend right, above, ->] node{Ordre ``INICIA\_TRIGGER''} (maquina_trigger);
+      \end{tikzpicture}
+      }
+      \caption{Diagrama de la màquina d'estats per la comunicació bidireccional}
+\end{figure}
+
+\clearpage
+
+El protocol de comunicació bidireccional utilitza un byte de control
+amb valor 128 seguits d'un byte que indica el tipus de missatge
+enviat:
+
+\begin{itemize}
+\item MCU\_FINESTRA: Indica el final d'un paquet de mostres. Pot tenir
+  qualsevol mida.
+\item MCU\_FACTOR\_OVERSAMPLING\_CANVIAT: Indica èxit en canviar el
+  nombre de mostres del filtre de mitjana.
+\item MCU\_FACTOR\_OVERSAMPLING: És un paquet que conté un byte amb el
+  nombre de mostres del filtre de mitjana.
+\item MCU\_N\_MOSTRES\_CANVIADES: Indica que el nombre de mostres
+  d'una finestra s'ha canviat.
+\item MCU\_N\_MOSTRES: Paquet que conté el nombre de mostres d'una
+  finestra (2 bytes).
+\item MCU\_FS: Retorna la freqüència de mostreig de l'ADC.
+\item MCU\_NIVELL\_TRIGGER\_CANVIAT: Indica que el nivell del
+  ``trigger'' s'ha canviat.
+\item MCU\_NIVELL\_TRIGGER: Retorna un byte amb el nivell de
+  ``trigger''.
+\item MCU\_ERROR: Aquest missatge indica que s'ha produït un error en
+  la comunicació amb l'Arduino. Pot ser causat per una comanda
+  incorrecta, valors invà\lgem ids...
+\end{itemize}
+
+\subsection{Filtre per reduïr la freqüència de mostreig efectiva}
+
+L'implementació del filtre per reduir la freqüència de mostreig
+efectiva utilitza una tècnica de mitjana de ``n'' mostres. Aquesta
+tècnica permet mantenir la mateixa freqüència de mostreig, i alhora
+reduir el soroll capturat per l'ADC. La freqüència efectiva es calcula
+dividint la freqüència de mostreig original pel nombre de mostres
+utilitzades en cada càlcul de mitjana ($\frac{F_{s}}{n}$).
+
+Aquest tractament del senyal pot ser útil quan es vol visualitzar
+senyals de més baixa freqüència amb més resolucio (> 8 bits), o com a
+mètode per augmentar les divisions de temps. Però és important tenir
+en compte que aquesta mitjana pot tenir un efecte negatiu en la
+captura de pics ràpids. El suavitzament de les fluctuacions pot
+provocar que els pics ràpids es redueixin o desapareguin a la
+representació gràfica. Aquesta és una limitació inherent de la tècnica
+de mitjana, i s'hauria de solucionar amb altres enfocaments, com el
+``trigger'' amb detecció de pics.
+
 \section{Programa auxiliar amb Rust}
 
-\section{Script de GNUPlot}
+El programa d'OsPlot-MCU escrit en Rust està orientat a la programació
+asíncrona i per esdeveniments. Concretament s'utilitza ``tokio'', una
+biblioteca de programació asíncrona per al llenguatge
+Rust. Proporciona eines i abstraccions per gestionar aquest paradigma
+de programació de manera senzilla. En concret es fa servir l'extensió
+``tokio-serial'', que afegeix la possibilitat d'interactuar amb ports
+sèrie de manera asíncrona.
+
+La tasca principal del programa és una funció que, primer de tot,
+inicialitza el port sèrie enviant la comanda per iniciar el
+``trigger'' del microcontrolador. Seguit d'això, es crea el procés de
+GNUPlot en un directori temporal, que conté la cua per la transmissió
+de mostres i el ``script'' que ha d'executar.  Aquest ``script''
+inclou alguna modificació, ja que els valors de l'eix ``x'' s'envien
+també per la cua, evitant a GNUPlot càlculs per cada representació.
+
+Aquesta tasca entra en un bucle que contínuament llegeix paquets del
+port sèrie. Quan arriba un paquet de mostres, les mostres es copien a
+un ``array'' que contindrà cada mostra i la seva corresponent ``x'', i
+l'enviarà directament a través de la canonada (actualment, per la
+resta de paquets no es realitza accions rellevants). Aquest bucle
+només podrà acabar quan, o bé hi hagi algún error (es tanca el port
+sèrie, mor el procés de GNUPlot...), o si la tasca de la ``CLI'' li
+envia un missatge de tancament (per Ctrl-C, ordre de sortida...).
+
+La tasca de la ``CLI'' té com a funció interpetar ordres de l'usuari
+(que arriben per ``stdin'') i transmetre-les a la tasca principal.
+Per limitacions de ``tokio'', en comptes de crear una tasca per llegir
+la ``stdin'', es crea un fil que llegeix l'entrada de l'usuari i
+l'envia a la tasca de la ``CLI''. I per gestionar el Ctrl-C, es crea
+un altre fil que envia una senyal a la mateixa tasca.
+
+Tota la comunicació entre tasques és possible gràcies als ``MPSC''
+(``Multi-Producer Single-Consumer'') i ``Oneshots'', que són canals
+asíncrons que permeten la comunicació entre múltiples tasques. Separar
+el programa en aquestes tasques permet separar els diferents blocs
+d'esdeveniments d'una manera clara i estructurada.
+
 
 \printbibliography
 
