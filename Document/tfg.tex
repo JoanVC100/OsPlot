@@ -56,7 +56,7 @@
 
 \title{OsPlot: Com implementar osci\lgem oscopis amb un microcontrolador i Linux}
 
-\subtitle{Subtítol}
+\subtitle{Una guia pràctica per a la creació d'un osci\lgem oscopi digital amb plataformes obertes}
 
 \author{Joan Vilardaga Castro}
 
@@ -69,20 +69,19 @@ Tot el meu agraïment.
 \end{acknowledgments}
 
 \begin{resum}
-Aquest document descriu una solució anomenada OsPlot, una arquitectura
-genèrica que permet transformar un microcontrolador i un ordinador en
-un osci\lgem oscopi funcional. Mitjançant l'ús de plataformes obertes
-com Linux, Arduino i GNUPlot, aquesta investigació intenta oferir una
-solució de baix cost i accessible per a gent interessada en l'anàlisi
-de senyals.
+En aquest document es descriu una guia que permeti a qualsevol persona
+transformar un microcontrolador i un ordinador en un osci\lgem oscopi
+funcional. Mitjançant l'ús de plataformes obertes com Linux, Arduino i
+GNUPlot, aquesta investigació intenta oferir una solució de baix cost
+i accessible per a gent interessada en l'anàlisi de senyals.
 \end{resum}
 
 \begin{abstract}
-This document describes a solution named OsPlot, which is a generic
-architecture that allows transforming a microcontroller and a computer
-into a functional oscilloscope. By using open platforms such as Linux,
-Arduino and GNUPlot, this research aims to provide a low-cost and
-accessible solution for people interested in signal analysis.
+This document describes a guide that enables anyone to transform a
+microcontroller and a computer into a functional oscilloscope By using
+open platforms such as Linux, Arduino and GNUPlot, this research aims
+to provide a low-cost and accessible solution for people interested in
+signal analysis.
 \end{abstract}
 
 \begin{document}
@@ -101,11 +100,10 @@ que GNUPlot és una eina per fer gràfics estàtics, es pot combinar amb
 altres programes o ``scripts'' per aconseguir la funcionalitat de
 traçat en temps real.
 
-És precisament aquest descobriment el que ha obert la porta a la
+És precisament aquest descobriment el que obre la porta a la
 possibilitat de fer un osci\lgem oscopi amb GNUPlot com a plataforma
-principal. Així, aquesta investigació s'enfoca a explorar la
-viabilitat d'utilitzar GNUPlot per a la creació d'un osci\lgem oscopi
-digital totalment funcional.
+principal. Així, aquesta investigació s'enfoca a preparar una guia que
+permeti crear un osci\lgem oscopi digital mitjançant GNUPlot.
 
 \section{Objectius}
 \label{sec:objectius}
@@ -113,9 +111,10 @@ digital totalment funcional.
 \begin{enumerate}
 	\item Evaluar la capacitat de GNUPlot per visualtizar dades en
           temps real.
-	\item Desenvolupar i avaluar OsPlot com a solució genèrica per
+	\item Desenvolupar OsPlot, una arquitectura genèrica per
           transformar un microcontrolador i un ordinador en un
           osci\lgem oscopi.
+      \item Estendre l'arquitectura amb alternatives a GNUPlot.
 	\item Implementar programes de referència que explotin les
           diferents possibilitats de l'arquitectura.
 \end{enumerate}
@@ -223,9 +222,9 @@ de dades, caldrà alguna manera de sincronitzar les escriptures del
 programa auxiliar i les lectures de GNUPlot. La principal dificultat
 de sincronitzar aquest mètode ve perquè GNUPlot no ofereix una manera
 directa per fer servir la comunicació entre processos. És difícil
-establir una comunicació bidireccional entre productor i consumidor
-(Programa auxiliar i GNUPlot) sense mètodes com les cues de missatges
-\cite{cues-missatges} o ``sockets UNIX'' \cite{sockets-unix}.
+establir una comunicació bidireccional entre programa auxiliar i
+GNUPlot sense mètodes com les cues de missatges \cite{cues-missatges}
+o ``sockets UNIX'' \cite{sockets-unix}.
 
 Per altra banda, també preocupa la possible sobrecàrrega d'interactuar
 amb un fitxer en constant reescriptura. Tot i que el fitxer està a la
@@ -239,29 +238,29 @@ fins al punt d'impossibilitar-la.
 Una bona alternativa respecte a la reescriptura contínua serien les
 canonades amb nom (\cite[``Named Pipes'']{canonades-nom}) o FIFOs
 (``First-In First-Out''). Les canonades són un mecanisme de
-comunicació unidireccional entre processos que permet la transmissió
-de dades unidireccional. En concret, les canonades amb nom són
-accessibles per qualsevol procés, ja que apareixen al sistema de
-fitxers com un fitxer especial.
+transmissió unidireccional de dades entre processos. En concret, les
+canonades amb nom són accessibles per qualsevol procés, ja que
+apareixen al sistema de fitxers com un fitxer especial.
 
 En contrast amb l'enfocament de reescriure contínuament un fitxer, les
 canonades eviten la necessitat de sincronitzar les escriptures i
-lectures entre el programa auxiliar i GNUPlot, ja que les dades es
-transmeten directament de manera unidireccional. I tancar una canonada
-per la banda del transmissor provoca un final de fitxer, generant la
+lectures entre el programa auxiliar i GNUPlot. Tancar una canonada per
+la banda del transmissor provoca un final de fitxer, generant la
 condició perfecte per senyalitzar a GNUPlot que ha llegit totes les
 mostres a representar.
 
 A més, les canonades proporcionen un mecanisme de comunicació
 eficient, ja que les dades es transmeten en memòria compartida, sense
-la necessitat d'operacions de fitxers específiques. Això minimitza la
-sobrecàrrega associada amb les crides de sistema per a l'obertura,
-tancament i altres operacions de fitxers.
+la necessitat d'altres operacions de fitxers específiques (com
+``flush''). Això minimitza la sobrecàrrega associada amb les crides de
+sistema per a l'obertura, tancament i altres operacions de fitxers.
 
-Però cal tenir en compte que l'ús de canonades pot generar
-sobrecàrrega en la interacció amb el sistema de fitxers. Com que es
-treballa amb la condició de final de fitxer, GNUPlot ha d'obrir i
-tancar la canonada cada cop que arriba un bloc de mostres.
+Però cal tenir en compte que l'ús de canonades, encara que menys que
+la reescriptura, segueix havent-hi una petita sobrecàrrega per haver
+d'interactuar amb mètodes de fitxers. Com que es treballa amb la
+condició de final de fitxer, GNUPlot ha d'obrir i tancar la canonada
+cada cop que arriba un bloc de mostres (quatre crides de sistema per
+finestra de mostres).
 
 Això vol dir que, tot i que serà més eficient que la reescriptura d'un
 fitxer (ja que és un mètode que està pensat per comunicar ràpidament
@@ -306,21 +305,22 @@ de 9615 Hz. Per aprofitar el temps, ja s'inicia la primera lectura de
 l'ADC.
 
 Seguidament, es configura el port sèrie per establir la velocitat de
-transmissió a 1 Mbps, i altres configuracions típiques com 8 bits per
-paquet, sense paritat i un bit de parada. Un cop inicialitzat
-s'activen les interrupcions, ja que la llibreria del port sèrie ho
-requereix.
+transmissió a 1 Mbps, que permet enviar fins a 100.000 mostres per
+segon. Aquesta velocitat de transmissió es calcula tenint en compte
+que cada paquet del port sèrie està format per 8 bits de dades,
+juntament amb 1 bit d'inici i 1 bit de parada ($\frac{1 Mbps}{10 bits}$).
 
-Finalment, l'Arduino entra en un bucle infinit on espera que la mostra
-estigui preparada. Quan ja s'obté la mostra, ràpidament s'inicia una
-nova lectura i s'envia la mostra actual a l'ordinador.
+Finalment, s'activen les interrupcions pel port sèrie i l'Arduino
+entra en un bucle infinit on espera que la mostra estigui
+preparada. Quan ja s'obté la mostra, ràpidament s'inicia una nova
+lectura i s'envia la mostra actual a l'ordinador.
 
 \subsection{``Script'' de GNUPlot}
 
 GNUPlot és un intèrpret d'ordres que permet generar gràfiques a partir
-de dades. Per aconseguir la visualització en temps real de les dades
+de fitxers. Per aconseguir la visualització en temps real de les dades
 capturades, cal definir un seguit d'ordres que GNUPlot interpretarà
-per fer la visualització de les dades.
+per fer la visualització d'aquestes.
 
 Primer de tot s'han de configurar els aspectes visuals de la gràfica,
 com ara els colors, els tipus de línies i els rangs dels eixos ``x'' i
@@ -371,7 +371,7 @@ es basa en la seva capacitat per gestionar canonades i interaccions
 amb el port sèrie sense necessitat de llibreries addicionals.
 
 Per començar, és necessari configurar el port sèrie. Amb l'objectiu
-de simplificar el procés, s'utilitza l'eina \cite[``stty'']{stty}, que
+de simplificar el procés, s'utilitza l'eina \cite[stty]{stty}, que
 permet configurar el fitxer del port sèrie com un pseudoterminal de
 Linux. D'aquesta manera, és possible llegir-lo com un fitxer normal
 mitjançant les funcions ``fopen'', ``fread'', i altres.
@@ -443,7 +443,7 @@ gestionar el sistema del ``trigger''.
 \subsection{Extensions}
 \label{subsec:extensions-osplot-pc}
 
-\subsubsection{Comunicació entre microcontrolador i ordinador}
+\subsubsection{Mètode de comunicació entre microcontrolador i ordinador}
 
 Fins ara, s'ha posat èmfasi en la comunicació entre el
 microcontrolador i l'ordinador utilitzant el port sèrie, ja que és el
@@ -548,7 +548,9 @@ OsPlot-MCU adopta un enfocament diferent per a la comunicació entre el
 microcontrolador i l'ordinador. En aquest cas el programa del
 microcontrolador es modifica per implementar el sistema de ``trigger''
 directament en el mateix microcontrolador.
+
 \newpage
+
 L'avantatge principal d'aquesta solució és la seva eficiència,
 especialment quan el microcontrolador té una capacitat substancial de
 processament disponible. D'aquesta manera s'aprofita la totalitat dels
@@ -727,16 +729,13 @@ gràfic en temps real amb les noves dades.
 
 Com a punt de partida, es prendrà el programa desenvolupat a l'apartat
 \ref{programa-arduino-c} i s'hi incorporarà la màquina d'estats de
-l'apartat \ref{subsec:maquina-trigger}.  A més, s'afegirà la
+l'apartat \ref{subsec:maquina-trigger} mitjançant un bucle després
+d'inicialitzar els perifèrics. A més, s'afegirà la
 comunicació bidireccional per permetre canviar els paràmetres del
 ``trigger'' des de la interfície, mitjançant una altra màquina
 d'estats.  I per acabar, s'inclourà un filtre per reduir la freqüència
 de mostreig efectiva calculant una mitjana de ``n'' mostres per tal de
 reduir el soroll que captura l'ADC.
-
-S'incorporarà la màquina d'estats al programa d'Arduino mitjançant un
-bucle després d'inicialitzar els perifèrics.  Aquesta màquina d'estats
-dictarà quan s'envia a través del port sèrie les mostres capturades.
 
 El codi font d'aquesta implementació es pot trobar a
 \url{https://github.com/JoanVC100/OsPlot/tree/main/OsPlot-MCU}.
@@ -823,6 +822,8 @@ Rust. Proporciona eines i abstraccions per gestionar aquest paradigma
 de programació de manera senzilla. En concret es fa servir l'extensió
 ``tokio-serial'', que afegeix la possibilitat d'interactuar amb ports
 sèrie de manera asíncrona.
+
+\newpage
 
 La tasca principal del programa és una funció que, primer de tot,
 inicialitza el port sèrie enviant la comanda per iniciar el
