@@ -855,6 +855,95 @@ asíncrons que permeten la comunicació entre múltiples tasques. Separar
 el programa en aquestes tasques permet separar els diferents blocs
 d'esdeveniments d'una manera clara i estructurada.
 
+\chapter{Línies futures}
+
+\section{Múltiples esdeveniments de ``triggers'' per ``frame''}
+
+En buscar la simplicitat, les implementacions realitzades en el
+treball no tenen en compte la visualització de múltiples esdeveniments
+de ``trigger'' en un únic ``frame''.  Tota informació que no pugui ser
+representada en el transcurs de dos ``frames'' consecutius es
+descarta.  Això significa que, en casos on la freqüència del senyal és
+alta i hi ha una gran quantitat d'esdeveniments de ``trigger'' per
+temps de ``frame'', l'observador pot perdre moltes dades rellevants i
+no ser capaç de discernir tots els esdeveniments que s'han produït en
+el transcurs d'un ``frame''.
+
+Els osci\lgem oscopis professionals tenen en compte aquesta limitació
+i implementen solucions per superar-la. Un enfocament comú és
+utilitzar una representació visual que permet mostrar tots els
+disparaments generats en el transcurs d'un ``frame''
+determinat. Aquesta tècnica implica assignar una transparència
+variable als esdeveniments de ``trigger'', de manera que les ones més
+antigues apareguin més transparents, mentre que les ones més recents
+es mostren més clares i destacades. Aquesta representació visual
+proporciona una indicació de la forma i la tendència del senyal al
+llarg del temps sense augmentar la capacitat de visualització de la
+pantalla.
+
+Amb aquesta tècnica, l'observador pot identificar si hi ha hagut
+picades o canvis significatius en el senyal durant el ``frame'', així
+com observar si el senyal és estable o no. Aquesta informació és
+valuosa per a l'anàlisi i la comprensió del comportament del senyal en
+situacions en què hi ha múltiples esdeveniments de ``trigger'' en un
+període de temps que la pantalla de l'osci\lgem oscopi no podria
+representar (o fins i tot, que l'ull humà no podria apreciar).
+
+\section{Plantejar alternatives al port sèrie}
+
+En el marc d'aquest treball, s'ha observat que es pot arribar
+ràpidament al límit de velocitat del port sèrie. Amb una taxa d'ADC
+estable d'aproximadament 76.000 mostres per segon, utilitzar una
+velocitat de transmissió d'1 Mbps (100.000 mostres per segon) comença
+a ser insuficient per acomodar el flux de dades de l'osci\lgem
+oscopi. Si es pogués augmentar la velocitat de mostreig de l'ADC a
+l'Arduino, el port sèrie deixaria de ser una opció viable, ja que una
+velocitat de 2 Mbps resultaria molt més inestable que 1 Mbps,
+velocitat la qual ja és fora de l'estàndard.
+
+En vista d'aquesta limitació, cal explorar alternatives. Per exemple,
+es podria fer servir SPI, que permet una velocitat màxima de fins a 60
+Mbps en alguns casos, sense experimentar una càrrega excessiva. Això
+implicaria un augment significatiu en la taxa de mostreig teòrica,
+arribant a un màxim de 7,5 milions de mostres per segon.
+
+Una altra opció a considerar seria buscar mètodes de comunicació
+directa a través de la interfície USB, evitant conversions de port
+sèrie a USB i a l'inrevés (com és el cas de l'Arduino). El programa a
+l'ordinador podria accedir directament a l'USB, augmentant molt més
+les velocitats de transmissió teòriques, segons l'estàndard USB
+utilitzat.
+
+\section{Inclusió de SDR a l'arquitectura}
+
+Una altra línia futura interessant a explorar és l'ús de \cite[Ràdio
+  Definida per Software]{viqui-sdr} en l'arquitectura OsPlot. En lloc
+d'utilitzar protocols serials tradicionals com UART o SPI, així com
+altres tecnologies de xarxa com TCP/IP o WebSockets, l'ús de SDR pot
+proporcionar una solució més versàtil per a la lectura, el
+processament i l'enviament de mostres.
+
+Les SDR són dispositius que permeten capturar, processar i transmetre
+senyals de ràdio mitjançant programari. A diferència dels sistemes de
+ràdio tradicionals, que utilitzen components electrònics
+especialitzats per a funcions específiques, les SDR es basen en
+plataformes programables i flexibles que utilitzen processament
+digital de senyals per dur a terme diverses tasques de comunicació.
+Mitjançant l'ús de programari és possible canviar i adaptar els
+paràmetres i funcions de les SDR, com la modulació, la freqüència i la
+codificació, per adaptar-se a diferents aplicacions i requisits.
+
+S'hauria d'investigar com integrar-los a l'arquitectura OsPlot per
+intentar aprofitar les seves capacitats de processament digital. Una
+SDR permet capturar senyals analògics, convertir-los en senyals
+digitals i processar-los mitjançant algoritmes de processament de
+senyal digital. Això obriria la porta a una gran varietat de tècniques
+de modulació, codificació i descodificació que podrien ser utilitzades
+per a la transmissió de mostres. També s'hauria d'investigar l'ús de
+diferents bandes de freqüència que es podrien fer servir per a una
+millor transmissió de les mostres.
+
+\chapter{Conclusions}
 
 \printbibliography
 
