@@ -60,12 +60,28 @@
 
 \author{Joan Vilardaga Castro}
 
-\advisor{Francisco Del Aguila López}
-
-\dedication{Dedicació}
+\advisor{Francisco del Águila López}
 
 \begin{acknowledgments}
-Tot el meu agraïment.
+Vull expressar el meu més sincer agraïment a la meva família,
+especialment als meus estimats pares, per donar-me l'oportunitat
+d'obtenir una educació i per donar-me suport incondicional en aquesta
+etapa de la meva vida. Sense ells, aquest treball no hauria estat
+possible.
+
+També desitjo expressar el meu reconeixement a alguns dels meus
+professors que han tingut un paper fonamental en la meva formació
+acadèmica. A na Maria Antònia i en Carmelo, professors de secundària,
+els estic profundament agraït per la seva dedicació i per despertar en
+mi la passió per la informàtica i l'electrònica. I als professors de
+la universitat, na Rosa, en Sebas i en Xavier, vull agrair-los per la
+seva guia, el seu suport i els seus coneixements compartits durant el
+meu recorregut universitari.
+
+Menció especial a en Francisco, el meu tutor d'aquest Treball de Fi de
+Grau. Li estic profundament agraït per la seva idea que ha permès
+l'existència d'aquest treball, així com les seves aportacions durant el
+desenvolupament d'aquest.
 \end{acknowledgments}
 
 \begin{resum}
@@ -183,7 +199,7 @@ digital del senyal \cite{llibre-pds}:
 En aquest capítol primer s'explorarà la manera de convertir GNUPlot en
 una eina per visualitzar dades en temps real. Seguidament, s'intentarà
 dissenyar l'arquitectura més simple d'OsPlot, on una Arduino envia pel
-port sèrie mostres d'un byte, i GNUPlot les representa gràficament.  I
+port sèrie mostres d'un byte, i GNUPlot les representa gràficament. I
 finalment s'analitzaran les dues vies possibles per desenvolupar un
 osci\lgem oscopi amb sistema de ``trigger'', i s'intentarà ampliar al
 màxim les arquitectures proposades.
@@ -255,7 +271,7 @@ la necessitat d'altres operacions de fitxers específiques com
 sistema per a l'obertura, tancament i altres operacions de fitxers.
 
 Però cal tenir en compte que l'ús de canonades encara té una petita
-sobrecàrrega, tot i que és més petita que amb la reescriptura.  Com
+sobrecàrrega, tot i que és més petita que amb la reescriptura. Com
 que es treballa amb la condició de final de fitxer, GNUPlot ha d'obrir
 i tancar la canonada cada cop que arriba un bloc de mostres. La
 sobrecàrrega generada és equivalent a unes quatre crides de sistema
@@ -276,7 +292,7 @@ Aquesta arquitectura utilitzarà un Arduino, que contínuament generarà
 mostres amb l'ADC per enviar-les a través del port sèrie. Com que
 interessa tenir una freqüència de mostreig elevada (al voltant de 76
 kHz), l'ADC produirà mostres amb una resolució útil de 8 bits (a causa
-de les limitacions pròpies del perifèric).
+de les limitacions pròpies del perifèric, \cite{analisi-adc}).
 
 Es tindrà un programa auxiliar que obrirà una canonada amb nom i
 mantindrà el port sèrie obert, reenviant les mostres cap a la canonada
@@ -363,14 +379,14 @@ en temps real. En cada iteració del bucle, GNUPlot espera la recepció
 de les noves dades i procedeix a regenerar el gràfic per reflectir els
 últims canvis.
 
-\newpage
-
 \subsection{Programa auxiliar amb C}
 
 L'últim pas és implementar la comunicació entre el port sèrie i
 GNUPlot, la qual s'implementarà amb C. Aquesta elecció de llenguatge
 es basa en la seva capacitat per gestionar canonades i interaccions
 amb el port sèrie sense necessitat de llibreries addicionals.
+
+\newpage
 
 Per començar, és necessari configurar el port sèrie. Amb l'objectiu de
 simplificar el procés, s'utilitza l'eina \cite[stty]{stty}, que permet
@@ -395,6 +411,12 @@ es llegeixen 500 bytes del port sèrie, s'obre la canonada i s'hi
 escriuen els 500 bytes, i es tanca la canonada per generar la condició
 de final de fitxer.
 
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{imgs/OsPlot-Bàsic.png}
+  \caption{Captura de l'implementació d'OsPlot}
+\end{figure}
+
 \subsection{Sistema de ``trigger''}
 
 En aquesta versió simplificada d'OsPlot, s'ha prescindit de la
@@ -415,8 +437,6 @@ microcontrolador per enviar un nombre determinat de mostres un cop es
 produeixi la condició de ``trigger''. En aquest cas, l'algoritme
 s'executaria directament en el microcontrolador, permetent un programa
 auxiliar sense pràcticament modificacions.
-
-\newpage
 
 \section{OsPlot-PC}
 
@@ -478,8 +498,6 @@ principalment es pot enfocar de dues maneres:
           programa auxiliar.
 \end{itemize}
 
-\newpage
-
 \subsubsection{Millores a GNUPlot i alternatives}
 
 També és important destacar que l'enfocament actual s'ha centrat en la
@@ -514,7 +532,7 @@ mencionades suporten visualització en temps real de manera nativa.
 
 \subsection{Diagrama de l'arquitectura}
 
-\begin{figure}[!hb]
+\begin{figure}[!h]
       \centering
       \resizebox{\textwidth}{!}{
       \begin{tikzpicture}
@@ -550,8 +568,6 @@ OsPlot-MCU adopta un enfocament diferent per a la comunicació entre el
 microcontrolador i l'ordinador. En aquest cas el programa del
 microcontrolador es modifica per implementar el sistema de ``trigger''
 directament en el mateix microcontrolador.
-
-\newpage
 
 L'avantatge principal d'aquesta solució és la seva eficiència,
 especialment quan el microcontrolador té una capacitat substancial de
@@ -593,6 +609,8 @@ impliquen l'ús d'eines com
 \href{https://protobuf.dev/}{\underline{Protobuf}}, un mecanisme
 eficient de serialització que permet estructurar dades per crear un
 protocol de comunicació.
+
+\newpage
 
 \subsection{Diagrama de l'arquitectura}
 
@@ -725,6 +743,12 @@ paquet de mostres a través del WebSocket, es copien totes les mostres
 a les ``ys'' i es crida la funció ``update()'' per actualitzar el
 gràfic en temps real amb les noves dades.
 
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{imgs/OsPlot-PC.png}
+  \caption{Captura de l'implementació d'OsPlot-PC}
+\end{figure}
+
 \chapter{Implementació d'OsPlot-MCU amb Arduino-C/Rust/GNUPlot}
 
 \section{Modificació del programa d'Arduino}
@@ -735,7 +759,7 @@ l'apartat \ref{subsec:maquina-trigger} mitjançant un bucle després
 d'inicialitzar els perifèrics. A més, s'afegirà la
 comunicació bidireccional per permetre canviar els paràmetres del
 ``trigger'' des de la interfície, mitjançant una altra màquina
-d'estats.  I per acabar, s'inclourà un filtre per reduir la freqüència
+d'estats. I per acabar, s'inclourà un filtre per reduir la freqüència
 de mostreig efectiva calculant una mitjana de ``n'' mostres per tal de
 reduir el soroll que captura l'ADC.
 
@@ -831,7 +855,7 @@ La tasca principal del programa és una funció que, primer de tot,
 inicialitza el port sèrie enviant la comanda per iniciar el
 ``trigger'' del microcontrolador. Seguit d'això, es crea el procés de
 GNUPlot en un directori temporal, que conté la cua per la transmissió
-de mostres i el ``script'' que ha d'executar.  Aquest ``script''
+de mostres i el ``script'' que ha d'executar. Aquest ``script''
 inclou alguna modificació, ja que els valors de l'eix ``x'' s'envien
 també per la cua, evitant a GNUPlot càlculs per cada representació.
 
@@ -857,15 +881,21 @@ asíncrons que permeten la comunicació entre múltiples tasques. Separar
 el programa en aquestes tasques permet separar els diferents blocs
 d'esdeveniments d'una manera clara i estructurada.
 
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{imgs/OsPlot-MCU.png}
+  \caption{Captura de l'implementació d'OsPlot-MCU}
+\end{figure}
+
 \chapter{Línies futures}
 
 \section{Múltiples esdeveniments de ``triggers'' per ``frame''}
 
 En buscar la simplicitat, les implementacions realitzades en el
 treball no tenen en compte la visualització de múltiples esdeveniments
-de ``trigger'' en un únic ``frame''.  Tota informació que no pugui ser
+de ``trigger'' en un únic ``frame''. Tota informació que no pugui ser
 representada en el transcurs de dos ``frames'' consecutius es
-descarta.  Això significa que, en casos on la freqüència del senyal és
+descarta. Això significa que, en casos on la freqüència del senyal és
 alta i hi ha una gran quantitat d'esdeveniments de ``trigger'' per
 temps de ``frame'', l'observador pot perdre moltes dades rellevants i
 no ser capaç de discernir tots els esdeveniments que s'han produït en
@@ -919,7 +949,7 @@ utilitzat.
 \section{Inclusió de les SDR a l'arquitectura}
 
 Una altra línia futura interessant a explorar és l'ús de \cite[Ràdio
-  Definida per Software]{viqui-sdr} en l'arquitectura OsPlot. En lloc
+ Definida per Software]{viqui-sdr} en l'arquitectura OsPlot. En lloc
 d'utilitzar protocols serials tradicionals com UART o SPI, així com
 altres tecnologies de xarxa com TCP/IP o WebSockets, l'ús de SDR pot
 proporcionar una solució més versàtil per a la lectura, el
