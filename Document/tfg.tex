@@ -1,4 +1,4 @@
-\documentclass{tfgitic}[2023/06/30]
+\documentclass{tfgitic}[2023/07/07]
 % per a fórmules químiques
 \usepackage[version=4]{mhchem}
 % Per dibuixar gràfics: base general i gràfics senzills
@@ -100,7 +100,7 @@ i accessible per a gent interessada en l'anàlisi de senyals.
 \begin{abstract}
 \begin{otherlanguage}{english}
 This document describes a guide that enables anyone to transform a
-microcontroller and a computer into a functional oscilloscope By using
+microcontroller and a computer into a functional oscilloscope. By using
 open platforms such as Linux, Arduino and GNUPlot, this research aims
 to provide a low-cost and accessible solution for people interested in
 signal analysis.
@@ -129,13 +129,13 @@ permeti crear un osci\l.loscopi digital mitjançant GNUPlot.
 \section{Objectius}
 \label{sec:objectius}
 
-\begin{enumerate}
+\begin{enumerate} 
 	\item Evaluar la capacitat de GNUPlot per visualtizar dades en
           temps real.
-	\item Desenvolupar OsPlot, una arquitectura genèrica per
-          transformar un microcontrolador i un ordinador en un
-          osci\l.loscopi.
-      \item Estendre l'arquitectura amb alternatives a GNUPlot.
+	\item Desenvolupar una guia per OsPlot, una arquitectura genèrica
+          que pot transformar un microcontrolador i un ordinador en
+          un osci\l.loscopi.
+  \item Estendre l'arquitectura amb alternatives a GNUPlot.
 	\item Implementar programes de referència que explotin les
           diferents possibilitats de l'arquitectura.
 \end{enumerate}
@@ -361,7 +361,7 @@ canonada. Per obtenir una representació adequada, és necessari
 especificar-hi diversos paràmetres:
 
 \begin{itemize}
-	\item \ord|binary format="\%uchar"|: Aquest paràmetre té com a
+	\item \ord|binary format="%uchar"|: Aquest paràmetre té com a
           finalitat especificar el format de les dades que s'estan
           llegint des de la canonada. En aquest cas, s'indica que cada
           valor de l'eix $x$ és un byte, i l'eix $y$ el genera
@@ -391,7 +391,7 @@ reflectir els últims canvis.
 \subsection{Programa auxiliar amb C}
 
 L'últim pas és implementar la comunicació entre el port sèrie i
-GNUPlot, la qual s'implementarà amb C. Aquesta elecció de llenguatge
+GNUPlot, la qual s'implementarà amb C. Aquesta tria de llenguatge
 es basa en la seva capacitat per gestionar canonades i interaccions
 amb el port sèrie sense necessitat de llibreries addicionals.
 
@@ -484,7 +484,7 @@ obstant això, no hi ha cap restricció que impedeixi l'ús d'altres
 busos serial, com \acro{SPI} o \acro{I2C}, per transmetre les mostres
 des del microcontrolador. Això es pot realitzar mitjançant adaptadors
 a \acro{USB}, o altres sistemes com ara una placa Raspberry Pi, que
-incorporen suport per aquests busos de manera nativa.
+incorpora suport per aquests busos de manera nativa.
 
 A més, es pot ampliar encara més l'abast de comunicació utilitzant
 altres microcontroladors com l'ESP32, que permeten la transmissió de
@@ -500,7 +500,7 @@ principalment es pot enfocar de dues maneres:
 \begin{itemize}
 	\item Fent servir \cite[socat]{socat}, una eina que permet,
           entre altres funcionalitats, transformar un \est{socket} en
-          un PTY. Això vol dir que un programa de \est{trigger}
+          un \acro{PTY}. Això vol dir que un programa de \est{trigger}
           desenvolupat per al port sèrie hauria de ser compatible amb
           qualsevol microcontrolador que faci servir \est{sockets}.
 	\item Treballar directament amb \est{sockets}. Aquest mètode
@@ -518,7 +518,7 @@ del programa auxiliar i la seva integració amb el microcontrolador,
 però si es vol obtenir una solució més elaborada i eficient s'hauria
 de considerar l'ús de llibreries específiques per a GNUPlot, juntament
 amb un entorn de treball que permeti crear una interfície interactiva
-semblant a la d'un osci\l.loscopi tradicional.
+semblant a la d'un osci\l.loscopi.
 
 L'ús de llibreries dedicades per a GNUPlot ofereix avantatges com un
 major control i personalització dels gràfics, alhora que s'elimina la
@@ -589,7 +589,7 @@ recursos per altres tasques.
 Precisament per això, l'enfocament d'OsPlot-MCU és adequat en
 situacions en què es desitja minimitzar la càrrega computacional a
 l'ordinador per diversos motius. Per exemple, en aplicacions on s'ha
-de considerar l'eficiència energètica o si es vol reduir la
+de considerar l'eficiència energètica, o si es vol reduir la
 dependència de l'ordinador per a tasques de processament intensives.
 
 \subsection{Extensions}
@@ -674,10 +674,11 @@ algoritme de ``\est{trigger} normal'' activat per flanc de pujada
 (sense disparador automàtic).
 
 La màquina comença en l'estat ``ESPERANT\_TRIGGER'', on compara
-successivament les mostres d'entrada amb un nivell de trigger
-predefinit. Quan es detecta un flanc de pujada (la mostra actual és
-inferior al nivell de trigger i la mostra anterior és igual o superior
-al nivell de trigger), la màquina passa a l'estat ``CAPTURANT''.
+successivament les mostres d'entrada amb un nivell de \est{trigger}
+predefinit. Quan es detecta un flanc de pujada (la mostra anterior és
+inferior o igual al nivell de \est{trigger}, i la mostra actual és
+igual o superior al nivell de \est{trigger}), la màquina passa a
+l'estat ``CAPTURANT''.
 
 En l'estat de ``CAPTURANT'' es fa servir un comptador que disminueix a
 mesura que arriben les mostres. Un cop es captura un nombre de mostres
@@ -712,7 +713,7 @@ que està dissenyada per treballar amb Python asíncron
 
 Primerament, el programa de \est{trigger} ha de cridar a la funció
 \ord|websocket.serve()|, que crea un servidor WebSocket per acceptar
-peticions de connexions (escoltar al port 26142), i hi associa una
+peticions de connexions (escoltant al port 26142), i hi associa una
 funció que s'executarà per cada connexió entrant.
 
 Aquesta funció afegeix cada connexió en un conjunt global de Python
@@ -730,7 +731,7 @@ I per simplificar la comunicació entre la interfície i el
 \est{trigger} s'ha utilitzat Protobuf, que permet canviar els
 paràmetres de l'algoritme de \est{trigger} i rebre dades del servidor,
 com les mostres capturades. Protobuf fa servir un format de missatges
-estructurat i eficient ($\approx 2$bytes de sobrecàrrega per paquet de
+estructurat i eficient ($\approx 2$ bytes de sobrecàrrega per paquet de
 mostres), mantenint una transmissió de dades lleugera pels clients.
 
 \section{Interfície amb Chart.js}
@@ -741,16 +742,16 @@ avantatges d'entorns com Tauri per crear aplicacions multiplataforma.
 
 Per la construcció dels gràfics en temps real s'ha utilitzat una
 llibreria JavaScript anomenada Chart.js. Aquesta llibreria aprofita
-l'element \est{canvas} de HTML5 que permet oferir una experiència
-visual atractiva i interactiva, alhora que manté un bon rendiment
-respecte a altres alternatives.
+l'element \est{canvas} de HTML5 que ofereix una experiència visual
+atractiva i interactiva, alhora que manté un bon rendiment respecte
+a altres alternatives.
 
 A diferència de GNUPlot, es transfereixen directament les mostres a
 una matriu associada al gràfic (en comptes de fer servir
 cues). Aquesta matriu conté les dades dels eixos $x$ i $y$. Quan
 arriba un paquet de mostres a través del WebSocket, es copien totes
 les mostres a les $y$ i es crida la funció \ord|update()| per
-actualitzar el gràfic en temps real amb les noves dades.
+actualitzar el gràfic amb les noves dades.
 
 \begin{figure}[h]
   \centering \includegraphics[width=\textwidth]{imgs/OsPlot-PC.png}
@@ -819,7 +820,8 @@ enviat:
   d'una finestra s'ha canviat.
 \item MCU\_N\_MOSTRES: Paquet que conté el nombre de mostres d'una
   finestra (2 bytes).
-\item MCU\_FS: Retorna la freqüència de mostreig de l'\acro{ADC}.
+\item MCU\_FS: Retorna la freqüència de mostreig de l'\acro{ADC}. És
+  un real de \num{4} bytes.
 \item MCU\_NIVELL\_TRIGGER\_CANVIAT: Indica que el nivell del
   \est{trigger} s'ha canviat.
 \item MCU\_NIVELL\_TRIGGER: Retorna un byte amb el nivell de
@@ -831,18 +833,18 @@ enviat:
 
 \subsection{Filtre per reduïr la freqüència de mostreig efectiva}
 
-L'implementació del filtre per reduir la freqüència de mostreig
+La implementació del filtre per reduir la freqüència de mostreig
 efectiva utilitza una tècnica de mitjana de $n$ mostres. Aquesta
-tècnica permet mantenir la mateixa freqüència de mostreig, i alhora
-reduir el soroll capturat per l'\acro{ADC}. La freqüència efectiva es
-calcula dividint la freqüència de mostreig original pel nombre de
-mostres utilitzades en cada càlcul de mitjana ($\frac{F_{s}}{n}$).
+tècnica permet reduir el soroll capturat per l'\acro{ADC} disminuint
+la freqüència de mostreig efectiva. La freqüència efectiva es calcula
+dividint la freqüència de mostreig original pel nombre de mostres
+usades en el càlcul de mitjana ($\frac{F_{s}}{n}$).
 
 Aquest tractament del senyal pot ser útil quan es vol visualitzar
 senyals de més baixa freqüència amb més resolucio (> \SI{8}{\bits}), o
 com a mètode per augmentar les divisions de temps. Però és important
 tenir en compte que aquesta mitjana pot tenir un efecte negatiu en la
-captura de pics ràpids. El suavitzament de les fluctuacions pot
+captura de pics ràpids. El suavitzat de les fluctuacions pot
 provocar que els pics ràpids es redueixin o desapareguin a la
 representació gràfica. Aquesta és una limitació inherent de la tècnica
 de mitjana, i s'hauria de solucionar amb altres enfocaments, com el
@@ -853,7 +855,7 @@ de mitjana, i s'hauria de solucionar amb altres enfocaments, com el
 El programa d'OsPlot-MCU escrit en Rust està orientat a la programació
 asíncrona i per esdeveniments. S'utilitza tokio, una biblioteca de
 programació asíncrona per al llenguatge Rust. Proporciona eines i
-abstraccions per gestionar aquest paradigma de programació de manera
+abstraccions per gestionar aquesta tècnica de programació de manera
 senzilla. En concret es fa servir l'extensió tokio-serial, que afegeix
 la possibilitat d'interactuar amb ports sèrie asíncronament.
 
@@ -871,16 +873,16 @@ representació.
 Aquesta tasca entra en un bucle que contínuament llegeix paquets del
 port sèrie. Quan arriba un paquet de mostres, les mostres es copien a
 una matriu que contindrà cada mostra i la seva corresponent $x$, i
-l'enviarà directament a través de la canonada (actualment, per la
-resta de paquets no es realitza accions rellevants). Aquest bucle
-només podrà acabar quan, o bé hi hagi algún error (es tanca el port
-sèrie, mor el procés de GNUPlot\dots), o si la tasca de la \acro{CLI}
-li envia un missatge de tancament (per Ctrl-C, ordre de sortida\dots).
+l'enviarà directament a través de la canonada (per la resta de
+paquets no es realitza accions rellevants). Aquest bucle només podrà
+acabar quan, o bé hi hagi algún error (es tanca el port sèrie, mor
+el procés de GNUPlot\dots), o si la tasca de la \acro{CLI} li envia
+un missatge de tancament (per Ctrl-C, ordre de sortida\dots).
 
 La tasca de la \acro{CLI} té com a funció interpetar ordres de
-l'usuari (que arriben per \est{stdin}) i transmetre-les a la tasca
+l'usuari (que arriben per \fitx{stdin}) i transmetre-les a la tasca
 principal.  Per limitacions de tokio, en comptes de crear una tasca
-per llegir la \est{stdin}, es crea un fil que llegeix l'entrada de
+per llegir la \fitx{stdin}, es crea un fil que llegeix l'entrada de
 l'usuari i l'envia a la tasca de la \acro{CLI}. I per gestionar el
 Ctrl-C, es crea un altre fil que envia una senyal a la mateixa tasca.
 
@@ -939,15 +941,15 @@ acomodar el flux de dades de l'osci\lgem oscopi. Si es pogués
 augmentar la velocitat de mostreig de l'\acro{ADC} a l'Arduino, el
 port sèrie deixaria de ser una opció viable, ja que una velocitat de
 \SI{2}{\mega\bit\per\second} resultaria molt més inestable que
-\SI{1}{\mega\bit\per\second}, velocitat la qual ja és fora de
-l'estàndard.
+\SI{1}{\mega\bit\per\second} (velocitat la qual ja està fora de
+l'estàndard).
 
 En vista d'aquesta limitació, cal explorar alternatives. Per exemple,
 es podria fer servir \acro{SPI}, que permet una velocitat màxima de
 fins a 60 Mbps en alguns casos, sense experimentar una càrrega
 excessiva. Això implicaria un augment significatiu en la taxa de
-mostreig teòrica, arribant a un màxim de \num{7.5} milions de mostres
-per segon.
+mostreig teòrica, arribant a un màxim de \num[round-precision=1]{7.5}
+milions de mostres per segon.
 
 Una altra opció a considerar seria buscar mètodes de comunicació
 directa a través de la interfície \acro{USB}, evitant conversions de
@@ -958,12 +960,12 @@ l'estàndard \acro{USB} utilitzat.
 
 \section{Inclusió de les \acro{SDR} a l'arquitectura}
 
-Una altra línia futura interessant a explorar és l'ús de \cite[Ràdio
-  Definida per Software]{viqui-SDR} en l'arquitectura OsPlot. En lloc
-d'utilitzar protocols serials tradicionals com \acro{UART} o
-\acro{SPI}, així com altres tecnologies de xarxa com \acro{TCP/IP} o
-WebSockets, l'ús de \acro{SDR} pot proporcionar una solució més
-versàtil per a la lectura, el processament i l'enviament de mostres.
+Una altra línia futura interessant a explorar és l'ús de la \cite[Ràdio
+  Definida per Software]{viqui-sdr}. En lloc d'utilitzar protocols
+serials com \acro{UART} o \acro{SPI}, o altres tecnologies
+de xarxa com \acro{TCP/IP} o WebSockets, l'ús de una \acro{SDR}
+pot proporcionar una solució més versàtil per a la lectura, el
+processament i l'enviament de mostres.
 
 Les \acro{SDR} són dispositius que permeten capturar, processar i
 transmetre senyals de ràdio mitjançant programari. A diferència dels
@@ -982,23 +984,23 @@ intentar aprofitar les seves capacitats de processament digital. Una
 digitals i processar-los mitjançant algoritmes de processament de
 senyal digital. Això obriria la porta a una gran varietat de tècniques
 de modulació, codificació i descodificació que podrien ser utilitzades
-per a la transmissió de mostres. També s'hauria d'investigar l'ús de
-diferents bandes de freqüència que es podrien fer servir per a una
-millor transmissió de les mostres.
+per a la transmissió de mostres. També es podria investigar l'ús de
+diferents bandes de freqüència per a una millor transmissió de les
+mostres, etc\dots
 
 \chapter{Conclusions}
 
 El treball de final de grau ha aconseguit complir amb èxit els
 objectius establerts. En primer lloc, s'ha avaluat de manera
-exhaustiva de la capacitat de GNUPlot per a la visualització de dades
-en temps real. S'ha pogut demostrar múltiples maneres d'assolir que,
-sense modificacions addicionals, GNUPlot pugui funcionar en temps real
+exhaustiva la capacitat de GNUPlot per a la visualització de dades
+en temps real. S'ha pogut demostrar de múltiples maneres que,
+sense modificacions addicionals, GNUPlot pot funcionar en temps real
 d'una manera prou eficient.
 
-En segon lloc, s'ha desenvolupat amb èxit una arquitectura/guia que
-permet transformar un microcontrolador i un ordinador en un
-osci\l.loscopi funcional. L'arquitectura ha estat implementada de
-manera modular i flexible, permetent adaptar-se a diferents
+En segon lloc, s'ha desenvolupat amb èxit una guia que descriu una
+arquitectura capaç de transformar un microcontrolador i un ordinador
+en un osci\l.loscopi funcional. L'arquitectura ha estat implementada
+de manera modular i flexible, permetent adaptar-se a diferents
 microcontroladors i entorns de treball.
 
 A més, s'han realitzat implementacions de referència que exploren les
@@ -1025,7 +1027,7 @@ alternatives a GNUPlot (com ploterrs o Chart.js). Això permet als
 usuaris a estendre l'arquitectura amb altres eines de visualització de
 dades, adaptant-se a les seves necessitats i preferències.
 
-En resum, el treball aquest document serveix com una guia valuosa per
+En resum, el treball d'aquest document serveix com una guia valuosa per
 transformar un microcontrolador i un ordinador en un osci\l.loscopi
 digital totalment funcional, amb múltiples variants i funcionalitats.
 S'han complert els objectius plantejats, i s'ha proporcionat una base
