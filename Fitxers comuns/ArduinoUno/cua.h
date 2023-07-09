@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define LONGITUD_CUA 16
+#define LONGITUD_CUA 17
 typedef struct {
   uint8_t cua[LONGITUD_CUA];
   volatile uint8_t index_lectura, n_escriptures;

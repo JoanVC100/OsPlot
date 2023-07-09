@@ -23,7 +23,8 @@ bool cua_es_plena(const cua_t *const q) {
 
 void cua_posa(cua_t *const q, uint8_t v) {
   ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-    q->cua[(q->index_lectura + q->n_escriptures++) % LONGITUD_CUA] = v;
+    q->cua[(q->index_lectura + q->n_escriptures) % LONGITUD_CUA] = v;
+    q->n_escriptures++;
   }
 }
 
