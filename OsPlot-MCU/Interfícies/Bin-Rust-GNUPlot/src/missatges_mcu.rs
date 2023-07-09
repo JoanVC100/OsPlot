@@ -39,7 +39,7 @@ impl MsgCapçaleraMCU {
             130 => Ok(Self::MCUFactorOversamplingCanviat),
             131 => Ok(Self::MCUFactorOversampling),
             132 => Ok(Self::MCUNMostresCanviades),
-            133 => Ok(Self::MCUNMostresCanviades),
+            133 => Ok(Self::MCUNMostres),
             134 => Ok(Self::MCUFs),
             135 => Ok(Self::MCUNivellTriggerCanviat),
             136 => Ok(Self::MCUNivellTrigger),
